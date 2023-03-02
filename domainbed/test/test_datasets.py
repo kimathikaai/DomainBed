@@ -86,12 +86,12 @@ class TestOverlapDatasets(unittest.TestCase):
 
         for env in dataset:
             targets = set(env.targets)
-            print(
-                f"{dataset_name} {class_overlap_id}%, ",
-                f"env:{env.env_name}, test:{env.is_test_env}, ",
-                f"allowed:{env.allowed_classes}, targets:{targets}, ",
-                f"remove_classes:{env.remove_classes}",
-            )
+            # print(
+            #     f"{dataset_name} {class_overlap_id}%, ",
+            #     f"env:{env.env_name}, test:{env.is_test_env}, ",
+            #     f"allowed:{env.allowed_classes}, targets:{targets}, ",
+            #     f"remove_classes:{env.remove_classes}",
+            # )
             self.assertEqual(
                 set(env.allowed_classes),
                 targets,
