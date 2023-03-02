@@ -283,6 +283,7 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
                 env_dataset.remove_classes = []
 
             env_dataset.env_name = environment
+            print(f"\n[info] environment: {env_dataset.env_name}, classes: {env_dataset.allowed_classes}, is_test: {env_dataset.is_test_env}")
             self.datasets.append(env_dataset)
 
         self.input_shape = (3, 224, 224,)
@@ -314,6 +315,7 @@ class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["C", "L", "S", "V"]
     def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
+        print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "VLCS/")
         self.class_overlap = {
             0: [[0, 1], [2, 3], [4]],
@@ -328,6 +330,7 @@ class PACS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "S"]
     def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
+        print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "PACS/")
         self.class_overlap = {
             0: [[0, 1], [2, 3], [4, 5, 6]],
