@@ -108,7 +108,8 @@ def download_vlcs(data_dir):
 def download_mnist(data_dir):
     # Original URL: http://yann.lecun.com/exdb/mnist/
     full_path = stage_path(data_dir, "MNIST")
-    MNIST(full_path, download=True)
+    MNIST(full_path, train=True, download=True)
+    MNIST(full_path, train=False, download=True)
 
 
 # PACS ########################################################################
@@ -276,13 +277,13 @@ if __name__ == "__main__":
     parser.add_argument('--data_dir', type=str, required=True)
     args = parser.parse_args()
 
-    # download_mnist(args.data_dir)
-    download_pacs(args.data_dir)
-    # download_office_home(args.data_dir)
+    download_mnist(args.data_dir)
+    # download_pacs(args.data_dir)
+    download_office_home(args.data_dir)
     # download_domain_net(args.data_dir)
     # download_vlcs(args.data_dir)
     download_terra_incognita(args.data_dir)
     # download_spawrious(args.data_dir)
     # download_sviro(args.data_dir)
-    # Camelyon17Dataset(root_dir=args.data_dir, download=True)
+    Camelyon17Dataset(root_dir=args.data_dir, download=True)
     # FMoWDataset(root_dir=args.data_dir, download=True)
