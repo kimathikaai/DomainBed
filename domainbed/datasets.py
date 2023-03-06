@@ -328,7 +328,7 @@ class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["C", "L", "S", "V"]
     def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
-        print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
+        # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "VLCS/")
         self.class_overlap = {
             0: [[0, 1], [2, 3], [4]],
@@ -343,7 +343,7 @@ class PACS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "S"]
     def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
-        print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
+        # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "PACS/")
         self.class_overlap = {
             0: [[0, 1], [2, 3], [4, 5, 6]],
@@ -364,9 +364,17 @@ class DomainNet(MultipleEnvironmentImageFolder):
 class OfficeHome(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "R"]
-    def __init__(self, root, test_envs, hparams):
+    def __init__(self, root, test_envs, hparams, class_overlap_id: int):
         self.dir = os.path.join(root, "office_home/")
-        super().__init__(self.dir, test_envs, hparams['data_augmentation'], hparams)
+        self.class_overlap = {
+            0: [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
+            33: [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
+            66: [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
+            100: [list(range(65)), list(range(65)), list(range(65))],
+        }
+
+        super().__init__(self.dir, test_envs, hparams['data_augmentation'], hparams, 
+                         domain_class_filter=self.class_overlap[class_overlap_id])
 
 class TerraIncognita(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
