@@ -47,43 +47,7 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --n_trials ${trial}
 
 jobid=$(date +"%y%m%d%H%M%S")
-algorithm=CauseIRL_CORAL
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
-echo starting ${current_output_dir}
-mkdir -p current_output_dir
-
-echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
-       --data_dir=${datadir} \
-       --output_dir=${current_output_dir} \
-       --command_launcher local \
-       --overlap ${overlap} \
-       --steps ${steps} \
-       --single_test_envs \
-       --algorithms ${algorithm} \
-       --datasets ${datasets} \
-       --n_hparams ${n_hparams} \
-       --n_trials ${trial}
-
-jobid=$(date +"%y%m%d%H%M%S")
 algorithm=SelfReg
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
-echo starting ${current_output_dir}
-mkdir -p current_output_dir
-
-echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
-       --data_dir=${datadir} \
-       --output_dir=${current_output_dir} \
-       --command_launcher local \
-       --overlap ${overlap} \
-       --steps ${steps} \
-       --single_test_envs \
-       --algorithms ${algorithm} \
-       --datasets ${datasets} \
-       --n_hparams ${n_hparams} \
-       --n_trials ${trial}
-
-jobid=$(date +"%y%m%d%H%M%S")
-algorithm=SagNet
 current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
 mkdir -p current_output_dir
@@ -120,6 +84,42 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=CAD
+current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+echo starting ${current_output_dir}
+mkdir -p current_output_dir
+
+echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
+       --data_dir=${datadir} \
+       --output_dir=${current_output_dir} \
+       --command_launcher local \
+       --overlap ${overlap} \
+       --steps ${steps} \
+       --single_test_envs \
+       --algorithms ${algorithm} \
+       --datasets ${datasets} \
+       --n_hparams ${n_hparams} \
+       --n_trials ${trial}
+
+jobid=$(date +"%y%m%d%H%M%S")
+algorithm=Fishr
+current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+echo starting ${current_output_dir}
+mkdir -p current_output_dir
+
+echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
+       --data_dir=${datadir} \
+       --output_dir=${current_output_dir} \
+       --command_launcher local \
+       --overlap ${overlap} \
+       --steps ${steps} \
+       --single_test_envs \
+       --algorithms ${algorithm} \
+       --datasets ${datasets} \
+       --n_hparams ${n_hparams} \
+       --n_trials ${trial}
+
+jobid=$(date +"%y%m%d%H%M%S")
+algorithm=ARM
 current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
 mkdir -p current_output_dir
