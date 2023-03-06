@@ -158,6 +158,12 @@ class ColoredMNIST(MultipleEnvironmentMNIST):
         super(ColoredMNIST, self).__init__(root, [0.1, 0.2, 0.9],
                                          self.color_dataset, (2, 28, 28,), 2)
 
+        self.class_overlap = {
+            0: [[0], [1]],
+            66: [[0,1], [1]],
+            100: [[0,1], [0,1]],
+        }
+
         self.input_shape = (2, 28, 28,)
         self.num_classes = 2
 
@@ -290,7 +296,7 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
                 env_dataset.remove_classes = []
 
             env_dataset.env_name = environment
-            print(f"\n[info] environment: {env_dataset.env_name}, classes: {env_dataset.allowed_classes}, is_test: {env_dataset.is_test_env}")
+            # print(f"\n[info] environment: {env_dataset.env_name}, classes: {env_dataset.allowed_classes}, is_test: {env_dataset.is_test_env}")
             self.datasets.append(env_dataset)
 
         self.input_shape = (3, 224, 224,)
