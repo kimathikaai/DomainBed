@@ -1,5 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -69,12 +70,45 @@ class MLP(nn.Module):
 class ResNet(torch.nn.Module):
     """ResNet with the softmax chopped off and the batchnorm frozen"""
     def __init__(self, input_shape, hparams):
+        """
+        If you're using Compute Canada you will need to manually download
+        and store the appropriate resnet18 and resnet50 weight files. Currently
+        we are using:
+            ResNet18_Weights.IMAGENET1K_V1
+                "https://download.pytorch.org/models/resnet18-f37072fd.pth",
+            ResNet50_Weights.IMAGENET1K_V2
+                "https://download.pytorch.org/models/resnet50-11ad3fa6.pth",
+
+        """
         super(ResNet, self).__init__()
-        if hparams['resnet18']:
-            self.network = torchvision.models.resnet18(pretrained=True)
+        resnet18 = hparams['resnet18']
+        if resnet18:
+            pretrain_weight = "~/scratch/saved/resnet18-f37072fd.pth"
+            if os.path.exists(pretrain_weight):
+                print(
+                    f"[info] loading weights resnet18: {resnet18}, from {pretrain_weight}"
+                )
+                self.network = torchvision.models.resnet18()
+                self.network.load_state_dict(torch.load(pretrain_weight))
+            else:
+                self.network = torchvision.models.resnet18(
+                    weights=torchvision.models.ResNet18_Weights.IMAGENET1K_V1
+                )
+
             self.n_outputs = 512
         else:
-            self.network = torchvision.models.resnet50(pretrained=True)
+            pretrain_weight = "~/scratch/saved/resnet50-11ad3fa6.pth"
+            if os.path.exists(pretrain_weight):
+                print(
+                    f"[info] loading weights resnet50: {resnet18}, from {pretrain_weight}"
+                )
+                self.network = torchvision.models.resnet50()
+                self.network.load_state_dict(torch.load(pretrain_weight))
+            else:
+                self.network = torchvision.models.resnet50(
+                    weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2
+                )
+
             self.n_outputs = 2048
 
         # self.network = remove_batch_norm_from_resnet(self.network)
