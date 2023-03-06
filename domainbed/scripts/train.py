@@ -256,11 +256,11 @@ if __name__ == "__main__":
                 results[name+'_nacc'] = non_overlap_class_acc
                 results[name+'_oacc'] = overlap_class_acc
             
-            # tsne data gen, plotting and saving done here
+            # tsne data gen, plotting and saving done here - temporarily done only at end
             tsne_df = pd.concat(tsne_dfs)
-            tsne_fig = misc.get_tsne_plot(tsne_df)
+            #tsne_fig = misc.get_tsne_plot(tsne_df)
             tsne_df.to_csv(os.path.join(args.output_dir, f'tsne_data_{step}.csv'))
-            tsne_fig.savefig(os.path.join(args.output_dir, f'tsne_plot_{step}.png'))
+            #tsne_fig.savefig(os.path.join(args.output_dir, f'tsne_plot_{step}.png'))
 
             results['mem_gb'] = torch.cuda.max_memory_allocated() / (1024.*1024.*1024.)
 
@@ -286,6 +286,9 @@ if __name__ == "__main__":
 
             if args.save_model_every_checkpoint:
                 save_checkpoint(f'model_step{step}.pkl')
+                
+    tsne_fig = misc.get_tsne_plot(tsne_df)
+    tsne_fig.savefig(os.path.join(args.output_dir, f'tsne_plot_{step}.png'))
 
     save_checkpoint('model.pkl')
 
