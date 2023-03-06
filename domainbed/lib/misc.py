@@ -294,8 +294,6 @@ def accuracy(network, loader, weights, device, dataset):
 def get_tsne_data(network, loader, device, domain, n=100):
     df = pd.DataFrame({'latent_vector' : [], 'prediction' : [], 
                        'class' : [], 'domain' : []})
-    
-    n = 10 # hard-coded until we find suitable time
 
     zs = []
     ps = []
