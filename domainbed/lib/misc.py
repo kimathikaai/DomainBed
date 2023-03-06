@@ -22,6 +22,8 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+import algorithms
+
 
 def distance(h1, h2):
     """distance of two networks (h1, h2 are classifiers)"""
@@ -292,6 +294,8 @@ def accuracy(network, loader, weights, device, dataset):
 def get_tsne_data(network, loader, device, domain, n=100):
     df = pd.DataFrame({'latent_vector' : [], 'prediction' : [], 
                        'class' : [], 'domain' : []})
+    
+    n = 10 # hard-coded until we find suitable time
 
     zs = []
     ps = []
@@ -303,7 +307,10 @@ def get_tsne_data(network, loader, device, domain, n=100):
         for x, y in loader:
             x = x.to(device)
             y = y.to(device)
-            z = network.featurizer(x) # SAGNet uses .network_f for featurizer
+            if not isinstance(network, algorithms.SAGNet):
+                z = network.featurizer(x) 
+            else:
+                z = network.network_f(x) # SAGNet uses .network_f for featurizer
             p = network.predict(x)
 
             [zs.append(z_i.cpu().numpy()) for z_i in torch.flatten(z, 1)]
