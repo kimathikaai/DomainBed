@@ -306,15 +306,15 @@ def get_tsne_data(network, loader, device, domain, n=100):
             z = network.featurizer(x) # SAGNet uses .network_f for featurizer
             p = network.predict(x)
 
-            [zs.append(z_i) for z_i in torch.flatten(z, 1)]
-            [ps.append(p_i) for p_i in p]
-            [ys.append(y_i) for y_i in y]
+            [zs.append(z_i.cpu().numpy()) for z_i in torch.flatten(z, 1)]
+            [ps.append(p_i.cpu().numpy()) for p_i in p]
+            [ys.append(y_i.cpu().numpy()) for y_i in y]
 
             i += x.shape[0]
             if i > n:
                 break
 
-    df['latent_vector'] = np.array(zs)
+    df['latent_vector'] = zs
     df['prediction'] = np.array(ps)
     df['class'] = np.array(ys)
     df['domain'] = np.array([domain for _ in ys])
@@ -324,21 +324,28 @@ def get_tsne_data(network, loader, device, domain, n=100):
 def get_tsne_plot(df):
 
     # reduce dimensionality of featurized latent vectors
+    #[print(len(list(df['latent_vector'])[i])) for i in range(len(df['domain']))]
+    print("began PCA and TSNE")
     pca = PCA(n_components=48) 
-    pca.fit(df['latent_vector'])
-    df['pca_latent_vector']= pca.transform(source_zs[:n_samples])
-
+    zs = np.array(list(df['latent_vector']))
+    print(zs.shape)
+    print("Begin PCA fit")
+    pca.fit(zs)
+    print("Begin PCA transform")
+    zs = pca.transform(zs)
+    
+    print("finished PCA")
     tsne = TSNE(n_components=2, perplexity=10)
-    df['tsne_embeddings'] = tsne.fit_transform(df['pca_latent_vector'])
-
+    df['tsne_embeddings'] = list(tsne.fit_transform(zs))
+    print("finished TSNE")
     all_colours = list(mcolors.CSS4_COLORS.keys())
 
     fig = plt.figure()
     ax = plt.subplot(111)
 
     for i, label in enumerate(df['class'].unique()):
-        ax.scatter(x=df[df['class']==label]['tsne_embeddings'][:, 0].tolist(), 
-                   y=df[df['class']==label]['tsne_embeddings'][:, 1].tolist(), 
+        ax.scatter(x=np.array(list(df[df['class']==label]['tsne_embeddings']))[:, 0].tolist(), 
+                   y=np.array(list(df[df['class']==label]['tsne_embeddings']))[:, 1].tolist(), 
                     s = 2, c = all_colours[i], label=label)
 
     ax.legend()
