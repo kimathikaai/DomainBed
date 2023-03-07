@@ -83,7 +83,7 @@ class ResNet(torch.nn.Module):
         super(ResNet, self).__init__()
         resnet18 = hparams['resnet18']
         if resnet18:
-            pretrain_weight = "~/scratch/saved/resnet18-f37072fd.pth"
+            pretrain_weight = os.path.expanduser("~/scratch/saved/resnet18-f37072fd.pth")
             if os.path.exists(pretrain_weight):
                 print(
                     f"[info] loading weights resnet18: {resnet18}, from {pretrain_weight}"
@@ -97,7 +97,7 @@ class ResNet(torch.nn.Module):
 
             self.n_outputs = 512
         else:
-            pretrain_weight = "~/scratch/saved/resnet50-11ad3fa6.pth"
+            pretrain_weight = os.path.expanduser("~/scratch/saved/resnet50-11ad3fa6.pth")
             if os.path.exists(pretrain_weight):
                 print(
                     f"[info] loading weights resnet50: {resnet18}, from {pretrain_weight}"
