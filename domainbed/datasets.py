@@ -71,6 +71,18 @@ class DomainBedImageFolder(ImageFolder):
     def __len__(self) -> int:
         return len(self.samples)
 
+def get_overlapping_classes(class_split: List[List[int]], num_classes: int) -> List[int]:
+    """ 
+    Return the classes in multiple domains.
+    """
+    overlap = np.zeros(num_classes)
+    for data in class_split:
+        np.add.at(overlap, data, 1)
+
+    overlapping_classes = list(np.where(overlap>1)[0])
+
+    return overlapping_classes
+
 def get_dataset_class(dataset_name):
     """Return the dataset class with the given name."""
     if dataset_name not in globals():
@@ -121,7 +133,7 @@ class Debug224(Debug):
 
 class MultipleEnvironmentMNIST(MultipleDomainDataset):
     def __init__(self, root, environments, dataset_transform, input_shape,
-                 num_classes):
+                 num_classes, test_envs: List[int], domain_class_filter: List[List[int]]):
         super().__init__()
         if root is None:
             raise ValueError('Data directory not specified!')
@@ -140,6 +152,18 @@ class MultipleEnvironmentMNIST(MultipleDomainDataset):
         original_images = original_images[shuffle]
         original_labels = original_labels[shuffle]
 
+        assert len(test_envs) == 1, "Not performing leave-one-domain-out validation"
+        num_envs = len(environments) 
+
+        self.num_classes = num_classes
+        self.overlapping_classes = get_overlapping_classes(domain_class_filter, self.num_classes)
+
+        # Dynamically associate a filter with a domain except for test_envs[0]
+        num_filters = len(domain_class_filter)
+        assert num_envs-1 == num_filters # b/c exempt first test env
+        shift_filter = list(range(num_filters)) + list(range(num_filters))
+        shift_filter = shift_filter[test_envs[0]: test_envs[0] + num_filters]
+
         self.datasets = []
 
         for i in range(len(environments)):
@@ -148,21 +172,22 @@ class MultipleEnvironmentMNIST(MultipleDomainDataset):
             self.datasets.append(dataset_transform(images, labels, environments[i]))
 
         self.input_shape = input_shape
-        self.num_classes = num_classes
 
 
 class ColoredMNIST(MultipleEnvironmentMNIST):
     ENVIRONMENTS = ['+90%', '+80%', '-90%']
 
-    def __init__(self, root, test_envs, hparams):
-        super(ColoredMNIST, self).__init__(root, [0.1, 0.2, 0.9],
-                                         self.color_dataset, (2, 28, 28,), 2)
+    def __init__(self, root, test_envs, hparams, class_overlap_id: int):
 
         self.class_overlap = {
             0: [[0], [1]],
             66: [[0,1], [1]],
             100: [[0,1], [0,1]],
         }
+        self.class_overlap_id = class_overlap_id
+
+        super(ColoredMNIST, self).__init__(root, [0.1, 0.2, 0.9],
+                                         self.color_dataset, (2, 28, 28,), 2)
 
         self.input_shape = (2, 28, 28,)
         self.num_classes = 2
@@ -188,7 +213,9 @@ class ColoredMNIST(MultipleEnvironmentMNIST):
         x = images.float().div_(255.0)
         y = labels.view(-1).long()
 
-        return TensorDataset(x, y)
+        dataset = TensorDataset(x,y)
+
+        return dataset
 
     def torch_bernoulli_(self, p, size):
         return (torch.rand(size) < p).float()
@@ -235,7 +262,7 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
         if domain_class_filter is None:
             domain_class_filter = [list(range(self.num_classes)) for _ in range(num_envs-1)]
 
-        self.overlapping_classes = self.get_overlapping_classes(domain_class_filter, self.num_classes)
+        self.overlapping_classes = get_overlapping_classes(domain_class_filter, self.num_classes)
 
         # Dynamically associate a filter with a domain except for test_envs[0]
         num_filters = len(domain_class_filter)
