@@ -3,7 +3,7 @@
 # local variables
 outputdir=/pub2/podg
 datadir=/pub2/data
-datasets=PACS
+datasets=OfficeHome
 n_hparams=5
 steps=5001
 trial=3
@@ -12,9 +12,9 @@ overlap=0
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=ERM
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -30,9 +30,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=CORAL
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -48,9 +48,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=SelfReg
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -66,9 +66,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=MLDG
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -84,9 +84,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=CAD
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -102,9 +102,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=Fishr
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -120,9 +120,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=ARM
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
@@ -138,9 +138,9 @@ echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
 
 jobid=$(date +"%y%m%d%H%M%S")
 algorithm=Transfer
-current_output_dir=${outputdir}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
+current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
 echo starting ${current_output_dir}
-mkdir -p current_output_dir
+mkdir -p ${current_output_dir}
 
 echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
        --data_dir=${datadir} \
