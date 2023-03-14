@@ -449,6 +449,28 @@ class WILDSEnvironment:
     def __len__(self):
         return len(self.indices)
 
+class DomainBedWILDSEnvironment(WILDSEnvironment):
+    """
+    Custom version of WILDSEnvironment to allow class filtering
+    """
+    def __init__(
+            self, 
+            wilds_dataset,
+            metadata_name,
+            metadata_value,
+            transform=None,
+            remove_classes: List[int] = [],
+        ):
+        super().__init__(wilds_dataset, metadata_name, metadata_value, transform)
+        
+        # Remove specified classes
+        old_indices = self.indices
+        self.indices = []
+
+        for index in old_indices:
+            if self.dataset.y_array[index] not in remove_classes:
+                self.indices.append(index)
+
 
 class WILDSDataset(MultipleDomainDataset):
     INPUT_SHAPE = (3, 224, 224)
@@ -495,23 +517,132 @@ class WILDSDataset(MultipleDomainDataset):
         metadata_vals = wilds_dataset.metadata_array[:, metadata_index]
         return sorted(list(set(metadata_vals.view(-1).tolist())))
 
+class DomainBedWILDSDataset(MultipleDomainDataset):
+    def __init__(self, dataset, metadata_name, test_envs, augment, hparams, environments, domain_class_filter: List[List[int]] = None):
+        super().__init__()
 
-class WILDSCamelyon(WILDSDataset):
+        num_envs = len(environments) 
+        
+        assert len(test_envs) == 1, "Not performing leave-one-domain-out validation"
+
+        if isinstance(dataset, Camelyon17Dataset):  
+            self.idx_to_class = {0: "No Tumour", 1: "Tumour"}
+            self.num_classes = 2
+        elif isinstance(dataset, FMoWDataset):
+            categories = ["airport", "airport_hangar", "airport_terminal", "amusement_park", "aquaculture", "archaeological_site", "barn", "border_checkpoint", "burial_site", "car_dealership", "construction_site", "crop_field", "dam", "debris_or_rubble", "educational_institution", "electric_substation", "factory_or_powerplant", "fire_station", "flooded_road", "fountain", "gas_station", "golf_course", "ground_transportation_station", "helipad", "hospital", "impoverished_settlement", "interchange", "lake_or_pond", "lighthouse", "military_facility", "multi-unit_residential", "nuclear_powerplant", "office_building", "oil_or_gas_facility", "park", "parking_lot_or_garage", "place_of_worship", "police_station", "port", "prison", "race_track", "railway_bridge", "recreational_facility", "road_bridge", "runway", "shipyard", "shopping_mall", "single-unit_residential", "smokestack", "solar_farm", "space_facility", "stadium", "storage_tank", "surface_mine", "swimming_pool", "toll_booth", "tower", "tunnel_opening", "waste_disposal", "water_treatment_facility", "wind_farm", "zoo"]
+            self.idx_to_class = {}
+            [self.idx_to_class.update({idx: category}) \
+                for idx, category in enumerate(categories)]
+            self.num_classes = 62
+
+        if domain_class_filter is None:
+            domain_class_filter = [list(range(self.num_classes)) for _ in range(num_envs-1)]
+
+        self.overlapping_classes = self.get_overlapping_classes(domain_class_filter, self.num_classes)
+
+        # Dynamically associate a filter with a domain except for test_envs[0]
+        num_filters = len(domain_class_filter)
+        assert num_envs-1 == num_filters # b/c exempt first test env
+        shift_filter = list(range(num_filters)) + list(range(num_filters))
+        shift_filter = shift_filter[test_envs[0]: test_envs[0] + num_filters]
+
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+
+        augment_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ColorJitter(0.3, 0.3, 0.3, 0.3),
+            transforms.RandomGrayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+
+        self.datasets = []
+
+        for i, metadata_value in enumerate(
+                self.metadata_values(dataset, metadata_name)):
+            if augment and (i not in test_envs):
+                env_transform = augment_transform
+            else:
+                env_transform = transform
+
+            # setup class filtering
+            if i not in test_envs:
+                filter = domain_class_filter[shift_filter.pop()]
+                all_classes = set(list(self.idx_to_class.keys())) 
+                remove_classes = list(all_classes - set(filter))
+
+                env_dataset = DomainBedWILDSEnvironment(
+                    dataset, metadata_name, metadata_value, env_transform,
+                    remove_classes)
+
+                env_dataset.is_test_env = False
+                env_dataset.allowed_classes = filter
+                env_dataset.remove_classes = remove_classes
+            else:
+                env_dataset = DomainBedWILDSEnvironment(
+                    dataset, metadata_name, metadata_value, env_transform)
+
+                env_dataset.is_test_env = True
+                env_dataset.allowed_classes = list(range(self.num_classes))
+                env_dataset.remove_classes = []
+
+            env_dataset.env_name = environments[i]
+            self.datasets.append(env_dataset)
+
+        self.input_shape = (3, 224, 224,)
+        self.num_classes = dataset.n_classes
+
+    def metadata_values(self, wilds_dataset, metadata_name):
+        metadata_index = wilds_dataset.metadata_fields.index(metadata_name)
+        metadata_vals = wilds_dataset.metadata_array[:, metadata_index]
+        return sorted(list(set(metadata_vals.view(-1).tolist())))
+
+    def get_overlapping_classes(self, class_split: List[List[int]], num_classes: int) -> List[int]:
+        """ 
+        Return the classes in multiple domains.
+        """
+        overlap = np.zeros(num_classes)
+        for data in class_split:
+            np.add.at(overlap, data, 1)
+
+        overlapping_classes = list(np.where(overlap>1)[0])
+
+        return overlapping_classes
+    
+
+class WILDSCamelyon(DomainBedWILDSDataset):
     ENVIRONMENTS = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
-    def __init__(self, root, test_envs, hparams):
+    def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
         dataset = Camelyon17Dataset(root_dir=root)
+        self.class_overlap = {
+            0: [[0], [0], [1], [1]],
+            33: [[0,1], [0], [1,0], [1]],
+            100: [[0,1], [0,1], [0,1], [0,1]],
+        }
+        self.environment_names = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
+            "hospital_4"]
         super().__init__(
-            dataset, "hospital", test_envs, hparams['data_augmentation'], hparams)
+            dataset, "hospital", test_envs, hparams['data_augmentation'], hparams,
+            self.environment_names, self.class_overlap[class_overlap_id])
 
 
-class WILDSFMoW(WILDSDataset):
+class WILDSFMoW(DomainBedWILDSDataset):
     ENVIRONMENTS = [ "region_0", "region_1", "region_2", "region_3",
             "region_4", "region_5"]
     def __init__(self, root, test_envs, hparams):
         dataset = FMoWDataset(root_dir=root)
         super().__init__(
-            dataset, "region", test_envs, hparams['data_augmentation'], hparams)
+            dataset, "region", test_envs, hparams['data_augmentation'], hparams,
+            self.ENVIRONMENTS)
 
 
 ## Spawrious base classes

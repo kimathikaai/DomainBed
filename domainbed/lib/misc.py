@@ -290,9 +290,11 @@ def accuracy(network, loader, weights, device, dataset):
 
     return float(compute_acc), float(compute_f1), float(overlap_class_acc), float(non_overlap_class_acc)
 
-def get_tsne_data(network, loader, device, domain, n=100):
+def get_tsne_data(network, loader, device, domain, n=-1):
     df = pd.DataFrame({'latent_vector' : [], 'prediction' : [], 
                        'class' : [], 'domain' : []})
+
+    is_test = 1 if loader.dataset.is_test_env else 0
 
     zs = []
     ps = []
@@ -312,33 +314,36 @@ def get_tsne_data(network, loader, device, domain, n=100):
             [ys.append(y_i.cpu().numpy()) for y_i in y]
 
             i += x.shape[0]
-            if i > n:
+            if n > 0 and i > n:
                 break
 
     df['latent_vector'] = zs
     df['prediction'] = np.array(ps)
     df['class'] = np.array(ys)
     df['domain'] = np.array([domain for _ in ys])
+    df['is_test'] = np.array([is_test for _ in ys])
 
     return df
 
-def get_tsne_plot(df):
+def get_tsne_plot(path):
 
-    # reduce dimensionality of featurized latent vectors
-    #[print(len(list(df['latent_vector'])[i])) for i in range(len(df['domain']))]
+    df = pd.read_csv(path)
+
     print("began PCA and TSNE")
     pca = PCA(n_components=48) 
     zs = np.array(list(df['latent_vector']))
-    print(zs.shape)
+
     print("Begin PCA fit")
     pca.fit(zs)
+
     print("Begin PCA transform")
     zs = pca.transform(zs)
-    
     print("finished PCA")
+
     tsne = TSNE(n_components=2, perplexity=10)
     df['tsne_embeddings'] = list(tsne.fit_transform(zs))
     print("finished TSNE")
+    
     all_colours = list(mcolors.CSS4_COLORS.keys())
 
     fig = plt.figure()
