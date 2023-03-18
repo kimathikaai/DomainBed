@@ -49,6 +49,8 @@ class SelectionMethod:
         """
         _hparams_accs = self.hparams_accs(records)
         if len(_hparams_accs):
+            # get first [0] result and get the self.run_acc dict [0]
+            # and return the 'test_acc' value
             return _hparams_accs[0][0]['test_acc']
         else:
             return None
@@ -58,16 +60,20 @@ class OracleSelectionMethod(SelectionMethod):
     and checkpoints, but instead of taking the argmax over all
     checkpoints, we pick the last checkpoint, i.e. no early stopping."""
     name = "test-domain validation set (oracle)"
+    selec_metric = None
+    eval_metric = None
 
     @classmethod
-    def run_acc(self, run_records):
+    def run_acc(cls, run_records):
+        assert cls.selec_metric is not None
+        assert cls.eval_metric is not None
         run_records = run_records.filter(lambda r:
             len(r['args']['test_envs']) == 1)
         if not len(run_records):
             return None
         test_env = run_records[0]['args']['test_envs'][0]
-        test_out_acc_key = 'env{}_out_acc'.format(test_env)
-        test_in_acc_key = 'env{}_in_acc'.format(test_env)
+        test_out_acc_key = 'env{}_out_{}'.format(test_env, cls.eval_metric)
+        test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
         chosen_record = run_records.sorted(lambda r: r['step'])[-1]
         return {
             'val_acc':  chosen_record[test_out_acc_key],
@@ -77,37 +83,43 @@ class OracleSelectionMethod(SelectionMethod):
 class IIDAccuracySelectionMethod(SelectionMethod):
     """Picks argmax(mean(env_out_acc for env in train_envs))"""
     name = "training-domain validation set"
+    selec_metric = None
+    eval_metric = None
 
     @classmethod
-    def _step_acc(self, record):
+    def _step_acc(cls, record):
         """Given a single record, return a {val_acc, test_acc} dict."""
         test_env = record['args']['test_envs'][0]
         val_env_keys = []
         for i in itertools.count():
-            if f'env{i}_out_acc' not in record:
-                break
+            if f'env{i}_out_{cls.selec_metric}' not in record:
+                raise KeyError(f"Validation metric {i} {cls.selec_metric} not in record")
             if i != test_env:
-                val_env_keys.append(f'env{i}_out_acc')
-        test_in_acc_key = 'env{}_in_acc'.format(test_env)
+                val_env_keys.append(f'env{i}_out_{cls.selec_metric}')
+        test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
         return {
             'val_acc': np.mean([record[key] for key in val_env_keys]), # average of 20% split of train envs
             'test_acc': record[test_in_acc_key] # 80% split of the test env
         }
 
     @classmethod
-    def run_acc(self, run_records):
+    def run_acc(cls, run_records):
+        assert cls.selec_metric is not None
+        assert cls.eval_metric is not None
         test_records = get_test_records(run_records)
         if not len(test_records):
             return None
-        return test_records.map(self._step_acc).argmax('val_acc') 
+        return test_records.map(cls._step_acc).argmax('val_acc') 
         # return the record maximizing val_acc to represent the hparam group
 
 class LeaveOneOutSelectionMethod(SelectionMethod):
     """Picks (hparams, step) by leave-one-out cross validation."""
     name = "leave-one-domain-out cross-validation"
+    selec_metric = None
+    eval_metric = None
 
     @classmethod
-    def _step_acc(self, records):
+    def _step_acc(cls, records):
         """Return the {val_acc, test_acc} for a group of records corresponding
         to a single step."""
         test_records = get_test_records(records)
@@ -135,9 +147,11 @@ class LeaveOneOutSelectionMethod(SelectionMethod):
         }
 
     @classmethod
-    def run_acc(self, records):
+    def run_acc(cls, records):
+        assert cls.selec_metric is not None
+        assert cls.eval_metric is not None
         step_accs = records.group('step').map(lambda step, step_records:
-            self._step_acc(step_records)
+            cls._step_acc(step_records)
         ).filter_not_none()
         # records.group('step') creates a seperate record for each step
         if len(step_accs):

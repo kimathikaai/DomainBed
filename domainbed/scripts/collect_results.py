@@ -142,15 +142,21 @@ def print_results_tables(records, selection_method, latex):
         latex=latex)
 
 if __name__ == "__main__":
+    VIABLE_METRICS = ["acc", "nacc", "oacc", "f1"]
     np.set_printoptions(suppress=True)
 
     parser = argparse.ArgumentParser(
         description="Domain generalization testbed")
     parser.add_argument("--input_dir", type=str, required=True)
+    parser.add_argument("--selec_metric", type=str, required=True, choices=VIABLE_METRICS)
+    parser.add_argument("--eval_metric", type=str, required=True, choices=VIABLE_METRICS)
+    parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--overlap", type=str, required=True)
     parser.add_argument("--latex", action="store_true")
     args = parser.parse_args()
 
-    results_file = "results.tex" if args.latex else "results.txt"
+    results_file_name = f"domainbed_results_{args.dataset}_{args.overlap}_{args.selec_metric}_{args.eval_metric}"
+    results_file = f"{results_file_name}.tex" if args.latex else f"{results_file_name}.txt"
 
     sys.stdout = misc.Tee(os.path.join(args.input_dir, results_file), "w")
 
@@ -161,7 +167,7 @@ if __name__ == "__main__":
         print("\\usepackage{booktabs}")
         print("\\usepackage{adjustbox}")
         print("\\begin{document}")
-        print("\\section{Full DomainBed results}")
+        print(f"\\section{{DomainBed '{results_file_name}'}}")
         print("% Total records:", len(records))
     else:
         print("Total records:", len(records))
@@ -173,6 +179,8 @@ if __name__ == "__main__":
     ]
 
     for selection_method in SELECTION_METHODS:
+        selection_method.selec_metric = args.selec_metric
+        selection_method.eval_metric = args.eval_metric
         if args.latex:
             print()
             print("\\subsection{{Model selection: {}}}".format(
