@@ -14,6 +14,7 @@ def load_records(path):
     # ASSUMPTION: path is a directory of directories for DomainBed record directories
     search_path =os.path.join(path, '*', "*")
     dirs = glob.glob(search_path, recursive=True)
+    print(f"% Collecting records from {search_path}")
     records = []
     for i, subdir in tqdm.tqdm(list(enumerate(dirs)),
                                ncols=80,
