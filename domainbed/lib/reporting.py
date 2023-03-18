@@ -4,17 +4,22 @@ import collections
 
 import json
 import os
+import glob
 
 import tqdm
 
 from domainbed.lib.query import Q
 
 def load_records(path):
+    # ASSUMPTION: path is a directory of directories for DomainBed record directories
+    search_path =os.path.join(path, '*', "*")
+    dirs = glob.glob(search_path, recursive=True)
     records = []
-    for i, subdir in tqdm.tqdm(list(enumerate(os.listdir(path))),
+    for i, subdir in tqdm.tqdm(list(enumerate(dirs)),
                                ncols=80,
                                leave=False):
-        results_path = os.path.join(path, subdir, "results.jsonl")
+        # results_path = os.path.join(path, subdir, "results.jsonl")
+        results_path = os.path.join(subdir, "results.jsonl")
         try:
             with open(results_path, "r") as f:
                 for line in f:

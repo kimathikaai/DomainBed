@@ -1,16 +1,45 @@
 #!/bin/bash
 
-echo "*****************************0"
+overlap=0
+dataset='PACS'
+input_dir='/pub2/podg/'
+
+selec_metric='acc'
+eval_metric='acc'
 python -m domainbed.scripts.collect_results\
-	--input_dir=/pub2/tmp/0 \
+	--input_dir= $input_dir \
+    --eval_metric= $eval_metric \
+    --selec_metric= $selec_metric \
+    --overlap= $overlap \
+    --dataset= $dataset \
 	--latex
 
-echo "*****************************33"
+selec_metric='acc'
+eval_metric='f1'
 python -m domainbed.scripts.collect_results\
-	--input_dir=/pub2/tmp/33 \
+	--input_dir= $input_dir \
+    --eval_metric= $eval_metric \
+    --selec_metric= $selec_metric \
+    --overlap= $overlap \
+    --dataset= $dataset \
 	--latex
 
-echo "*****************************66"
+selec_metric='acc'
+eval_metric='oac'
 python -m domainbed.scripts.collect_results\
-	--input_dir=/pub2/tmp/66 \
+	--input_dir= $input_dir \
+    --eval_metric= $eval_metric \
+    --selec_metric= $selec_metric \
+    --overlap= $overlap \
+    --dataset= $dataset \
+	--latex
+
+selec_metric='acc'
+eval_metric='nacc'
+python -m domainbed.scripts.collect_results\
+	--input_dir= $input_dir \
+    --eval_metric= $eval_metric \
+    --selec_metric= $selec_metric \
+    --overlap= $overlap \
+    --dataset= $dataset \
 	--latex
