@@ -93,7 +93,7 @@ class IIDAccuracySelectionMethod(SelectionMethod):
         val_env_keys = []
         for i in itertools.count():
             if f'env{i}_out_{cls.selec_metric}' not in record:
-                raise KeyError(f"Validation metric {i} {cls.selec_metric} not in record")
+                break
             if i != test_env:
                 val_env_keys.append(f'env{i}_out_{cls.selec_metric}')
         test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
