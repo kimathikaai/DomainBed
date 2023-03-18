@@ -25,7 +25,7 @@ python -m domainbed.scripts.collect_results\
 	--latex
 
 selec_metric='acc'
-eval_metric='oac'
+eval_metric='oacc'
 python -m domainbed.scripts.collect_results\
 	--input_dir=$input_dir \
     --eval_metric=$eval_metric \
