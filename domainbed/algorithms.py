@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 # fmt: off
-from matplotlib.figure import projections
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
