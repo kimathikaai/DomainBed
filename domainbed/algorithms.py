@@ -2214,8 +2214,5 @@ class XDom(AbstractXDom):
 
 class SupCon(XDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams['xda_alpha'] = 1
         super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
-
-        # hparams
-        self.lmbd = hparams["lambda"]
-        self.xda_alpha = 1
