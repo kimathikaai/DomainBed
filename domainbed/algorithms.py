@@ -2161,7 +2161,7 @@ class Intra(AbstractXDom):
 
         intra_loss = 0
         class_loss = 0
-        samples = 0
+        mean_positives_per_sample = 0
 
         for i in values["num_domains"]:
             masks = self.get_masks(Y=values["targets"][i], D=values["domains"][i])
@@ -2174,12 +2174,13 @@ class Intra(AbstractXDom):
             )
 
             intra_loss += l
-            samples += s
+            mean_positives_per_sample += s
 
             class_loss += F.cross_entropy(values["classifs"][i], values["targets"][i])
 
         class_loss /= values["num_domains"]
         intra_loss /= values["num_domains"]
+        mean_positives_per_sample /= values['num_domains']
 
         loss = class_loss + self.lmbd * intra_loss
 
@@ -2191,7 +2192,7 @@ class Intra(AbstractXDom):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "intra_loss": intra_loss.item(),
-            "mean_p": samples / values["num_domains"],
+            "mean_p": mean_positives_per_sample.item(),
         }
 
 
@@ -2237,7 +2238,7 @@ class XDom(AbstractXDom):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
-            "mean_p": mean_positives_per_sample,
+            "mean_p": mean_positives_per_sample.item(),
         }
 
 
