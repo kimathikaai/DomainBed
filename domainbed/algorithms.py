@@ -2127,7 +2127,7 @@ class AbstractXDom(ERM):
 
         # create domain labels
         domains = [
-            torch.zeros(len(x), dtype=torch.uint8) + i for i, x in enumerate(targets)
+            torch.zeros(len(x), dtype=torch.uint8).to(x.device) + i for i, x in enumerate(targets)
         ]
 
         # match domains
