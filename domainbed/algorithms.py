@@ -2065,6 +2065,12 @@ class AbstractXDom(ERM):
 
         self.projector.apply(weight_init)
 
+        self.optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=self.hparams['lr'],
+            weight_decay=self.hparams['weight_decay']
+        )
+
     def get_masks(self, Y, D):
         """
         Generate masks relating samples and their domains/classes
