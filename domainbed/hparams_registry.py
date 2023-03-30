@@ -135,6 +135,15 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('gda', False, lambda r: True)
         _hparam('beta1', 0.5, lambda r: r.choice([0., 0.5]))
         _hparam('lr_d', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
+    elif algorithm == "XDom":
+        _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
+        _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('lambda', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
+    elif algorithm == "SupCon" or algorithm == "Intra":
+        _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
+        _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('lambda', 1, lambda r: 10**r.uniform(-1, 3))
 
     elif algorithm == 'EQRM':
         _hparam('eqrm_quantile', 0.75, lambda r: r.uniform(0.5, 0.99))
