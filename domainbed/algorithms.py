@@ -2054,7 +2054,7 @@ class AbstractXDom(ERM):
         self.projector = nn.Sequential(
             nn.Linear(encoder_output, encoder_output),
             nn.ReLU(),
-            nn.Linear(encoder_output, num_classes),
+            nn.Linear(encoder_output, 256),
         )
 
         def weight_init(m):
@@ -2097,6 +2097,10 @@ class AbstractXDom(ERM):
             torch.count_nonzero(positive_mask) / projections.shape[0]
         )
 
+        # count the number of samples with no positives
+        num_zero_positives = projections.shape[0] - \
+            torch.count_nonzero(positive_mask.sum(1))
+
         # proj_dot is cos similarity b/c features are normalized
         # find the dot product with respect to every x
         proj_dot = torch.div(torch.matmul(projections, projections.T), self.temperature)
@@ -2116,9 +2120,6 @@ class AbstractXDom(ERM):
         mean_log_prob_pos = (positive_mask * alpha * log_prob).sum(
             1
         ) / positive_mask.sum(1)
-
-        # count the number of samples with no positives
-        num_zero_positives = torch.count_nonzero(torch.isnan(mean_log_prob_pos))
 
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.nanmean()
