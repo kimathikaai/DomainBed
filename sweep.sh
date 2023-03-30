@@ -11,7 +11,7 @@ gpu=0
 overlap=0
 
 jobid=$(date +"%y%m%d%H%M%S")
-for algorithm in XDom Intra Supcon
+for algorithm in XDom Intra SupCon
 do
     current_output_dir=${outputdir}/${jobid}/${overlap}/${algorithm}_${datasets}_o${overlap}_h${n_hparams}_s${steps}_t${trial}_${jobid}
     echo starting ${current_output_dir}
