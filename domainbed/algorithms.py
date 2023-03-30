@@ -2057,6 +2057,14 @@ class AbstractXDom(ERM):
             nn.Linear(encoder_output, num_classes),
         )
 
+        def weight_init(m):
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+        self.projector.apply(weight_init)
+
     def get_masks(self, Y, D):
         """
         Generate masks relating samples and their domains/classes
@@ -2109,10 +2117,13 @@ class AbstractXDom(ERM):
             1
         ) / positive_mask.sum(1)
 
-        loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.mean()
+        # count the number of samples with no positives
+        num_zero_positives = torch.count_nonzero(torch.isnan(mean_log_prob_pos))
 
-        return loss, mean_positives_per_sample
+        loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
+        loss = loss.nanmean()
+
+        return loss, mean_positives_per_sample, num_zero_positives
 
     def preprocess(self, minibatches):
         # NOTE: current implementations doesn't create duplicates
@@ -2162,11 +2173,12 @@ class Intra(AbstractXDom):
         intra_loss = 0
         class_loss = 0
         mean_positives_per_sample = 0
+        num_zero_positives = 0
 
         for i in values["num_domains"]:
             masks = self.get_masks(Y=values["targets"][i], D=values["domains"][i])
 
-            l, s = self.supcon_loss(
+            l, s, n = self.supcon_loss(
                 projections=values["projections"][i],
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
@@ -2175,6 +2187,7 @@ class Intra(AbstractXDom):
 
             intra_loss += l
             mean_positives_per_sample += s
+            num_zero_positives += n
 
             class_loss += F.cross_entropy(values["classifs"][i], values["targets"][i])
 
@@ -2193,6 +2206,7 @@ class Intra(AbstractXDom):
             "class_loss": class_loss.item(),
             "intra_loss": intra_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item()
         }
 
 
@@ -2219,7 +2233,7 @@ class XDom(AbstractXDom):
             + masks["diff_domain_same_class_mask"] * self.xda_alpha
         )
 
-        xdom_loss, mean_positives_per_sample = self.supcon_loss(
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
             projections=projections,
             positive_mask=masks["same_class_mask"] * masks["self_mask"],
             negative_mask=masks["self_mask"],
@@ -2239,6 +2253,7 @@ class XDom(AbstractXDom):
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item()
         }
 
 
