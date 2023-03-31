@@ -17,7 +17,7 @@ do
     echo starting ${current_output_dir}
     mkdir -p ${current_output_dir}
 
-    echo 'y' |CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
+    CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
            --data_dir=${datadir} \
            --output_dir=${current_output_dir} \
            --command_launcher local \
@@ -28,5 +28,5 @@ do
            --datasets ${datasets} \
            --n_hparams ${n_hparams} \
            --n_trials ${trial} \
-           --skip_model_save
+           --skip_confirmation
 done
