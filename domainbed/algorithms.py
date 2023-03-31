@@ -2066,9 +2066,13 @@ class AbstractXDom(ERM):
         self.projector.apply(weight_init)
 
         self.optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.hparams['lr'],
-            weight_decay=self.hparams['weight_decay']
+            (
+                list(self.featurizer.parameters())
+                + list(self.classifier.parameters())
+                + list(self.projector.parameters())
+            ),
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
         )
 
     def get_masks(self, Y, D):
@@ -2094,7 +2098,14 @@ class AbstractXDom(ERM):
             "same_domain_same_class_mask": same_Y_mask * same_D_mask,
         }
 
-    def supcon_loss(self, projections, positive_mask, negative_mask, alpha):
+    def supcon_loss(
+        self,
+        projections,
+        positive_mask,
+        negative_mask,
+        alpha: float,
+        epsilon: float = 1e-6,
+    ):
         """
         Regular SupCon Loss with custom masks for positive and A(i) "negative" samples
         """
@@ -2104,8 +2115,9 @@ class AbstractXDom(ERM):
         )
 
         # count the number of samples with no positives
-        num_zero_positives = projections.shape[0] - \
-            torch.count_nonzero(positive_mask.sum(1))
+        num_zero_positives = projections.shape[0] - torch.count_nonzero(
+            positive_mask.sum(1)
+        )
 
         # proj_dot is cos similarity b/c features are normalized
         # find the dot product with respect to every x
@@ -2125,7 +2137,7 @@ class AbstractXDom(ERM):
         # compute mean of log-likelihood over positives
         mean_log_prob_pos = (positive_mask * alpha * log_prob).sum(
             1
-        ) / positive_mask.sum(1)
+        ) / (positive_mask.sum(1) + epsilon)
 
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.nanmean()
@@ -2145,7 +2157,8 @@ class AbstractXDom(ERM):
 
         # create domain labels
         domains = [
-            torch.zeros(len(x), dtype=torch.uint8).to(x.device) + i for i, x in enumerate(targets)
+            torch.zeros(len(x), dtype=torch.uint8).to(x.device) + i
+            for i, x in enumerate(targets)
         ]
 
         # match domains
@@ -2200,7 +2213,7 @@ class Intra(AbstractXDom):
 
         class_loss /= values["num_domains"]
         intra_loss /= values["num_domains"]
-        mean_positives_per_sample /= values['num_domains']
+        mean_positives_per_sample /= values["num_domains"]
 
         loss = class_loss + self.lmbd * intra_loss
 
@@ -2213,7 +2226,7 @@ class Intra(AbstractXDom):
             "class_loss": class_loss.item(),
             "intra_loss": intra_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
-            "zero_p": num_zero_positives.item()
+            "zero_p": num_zero_positives.item(),
         }
 
 
@@ -2260,11 +2273,11 @@ class XDom(AbstractXDom):
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
-            "zero_p": num_zero_positives.item()
+            "zero_p": num_zero_positives.item(),
         }
 
 
 class SupCon(XDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        hparams['xda_alpha'] = 1
+        hparams["xda_alpha"] = 1
         super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
