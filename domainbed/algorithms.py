@@ -2095,7 +2095,7 @@ class AbstractXDom(ERM):
         ) / (positive_mask.sum(1) + epsilon)
 
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
-        loss = loss.nanmean()
+        loss = loss.mean()
 
         return loss, mean_positives_per_sample, num_zero_positives
 
