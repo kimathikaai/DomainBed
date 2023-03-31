@@ -27,5 +27,6 @@ do
            --algorithms ${algorithm} \
            --datasets ${datasets} \
            --n_hparams ${n_hparams} \
-           --n_trials ${trial}
+           --n_trials ${trial} \
+           --skip_model_save
 done
