@@ -2195,7 +2195,7 @@ class Intra(AbstractXDom):
         mean_positives_per_sample = 0
         num_zero_positives = 0
 
-        for i in values["num_domains"]:
+        for i in range(values["num_domains"]):
             masks = self.get_masks(Y=values["targets"][i], D=values["domains"][i])
 
             l, s, n = self.supcon_loss(
