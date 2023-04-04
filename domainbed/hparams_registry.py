@@ -149,6 +149,7 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('base_temperature', 0.07, lambda r: 0.07)
         _hparam('intra_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
         _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
 
     elif algorithm == 'EQRM':
         _hparam('eqrm_quantile', 0.75, lambda r: r.uniform(0.5, 0.99))
