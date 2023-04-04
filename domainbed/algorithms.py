@@ -54,7 +54,8 @@ ALGORITHMS = [
     'CausIRL_MMD',
     'Intra',
     'XDom',
-    'SupCon'
+    'SupCon',
+    'Intra_XDom'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2090,9 +2091,9 @@ class AbstractXDom(ERM):
         log_prob = logits - torch.log(exp_logits.sum(1, keepdim=True))
 
         # compute mean of log-likelihood over positives
-        mean_log_prob_pos = (positive_mask * alpha * log_prob).sum(
-            1
-        ) / (positive_mask.sum(1) + epsilon)
+        mean_log_prob_pos = (positive_mask * alpha * log_prob).sum(1) / (
+            positive_mask.sum(1) + epsilon
+        )
 
         loss = -(self.temperature / self.base_temperature) * mean_log_prob_pos
         loss = loss.mean()
@@ -2236,3 +2237,75 @@ class SupCon(XDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["xda_alpha"] = 1
         super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+
+class Intra_XDom(AbstractXDom):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(Intra_XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+        self.intra_lmbd = hparams["intra_lmbd"]
+        self.xdom_lmbd = hparams["xdom_lmbd"]
+        self.xda_alpha = hparams["xda_alpha"]
+
+    def intra_update(self, values):
+        intra_loss = 0
+
+        for i in range(values["num_domains"]):
+            masks = self.get_masks(Y=values["targets"][i], D=values["domains"][i])
+
+            l, s, n = self.supcon_loss(
+                projections=values["projections"][i],
+                positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
+                negative_mask=masks["same_domain_mask"] * masks["self_mask"],
+                alpha=1,
+            )
+
+            intra_loss += l
+
+        intra_loss /= values["num_domains"]
+
+        return intra_loss
+
+    def xdom_update(self, values):
+        domains = torch.cat(values["domains"])
+        targets = torch.cat(values["targets"])
+        projections = torch.cat(values["projections"])
+
+        masks = self.get_masks(Y=targets, D=domains)
+
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
+            projections=projections,
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+        )
+
+        return xdom_loss
+
+    def update(self, minibatches, unlabeled=None):
+        values = self.preprocess(minibatches)
+
+        targets = torch.cat(values["targets"])
+        classifs = torch.cat(values["classifs"])
+
+        class_loss = F.cross_entropy(classifs, targets)
+        intra_loss = self.intra_update(values)
+        xdom_loss = self.xdom_update(values)
+
+        loss = class_loss + self.intra_lmbd * intra_loss + self.xdom_lmbd * xdom_loss
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "xdom_loss": xdom_loss.item(),
+            "intra_loss": intra_loss.item(),
+        }
