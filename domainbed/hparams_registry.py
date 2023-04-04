@@ -144,6 +144,11 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
         _hparam('lambda', 1, lambda r: 10**r.uniform(-1, 3))
+    elif algorithm == "Intra_XDom":
+        _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
+        _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('intra_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
 
 
     # Dataset-and-algorithm-specific hparam definitions. Each block of code
