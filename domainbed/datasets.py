@@ -464,6 +464,7 @@ class DomainBedWILDSEnvironment(WILDSEnvironment):
             if self.dataset.y_array[index] not in remove_classes:
                 self.indices.append(index)
 
+        self.targets = self.dataset.y_array[self.indices].numpy()
 
 class WILDSDataset(MultipleDomainDataset):
     INPUT_SHAPE = (3, 224, 224)
