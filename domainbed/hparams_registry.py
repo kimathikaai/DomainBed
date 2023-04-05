@@ -31,9 +31,15 @@ def _hparams(algorithm, dataset, random_seed):
     _hparam('resnet18', True, lambda r: True)
     _hparam('resnet_dropout', 0., lambda r: r.choice([0., 0.1, 0.5]))
     _hparam('class_balanced', False, lambda r: False)
-    # TODO: nonlinear classifiers disabled
+    # TODO: nonlinear classifiers disabled, set all to True
+    # PACS: Transfer, MLDG, XDom for 66
+    # OfficeHome: CORAL, SelfReg, XDom FOR 66
+    # VLCS: ARM, ERM, XDom for 66 (stretch)
+    # send script
+    # _hparam('nonlinear_classifier', True,
+    #         lambda r: True)
     _hparam('nonlinear_classifier', False,
-            lambda r: bool(r.choice([False, False])))
+            lambda r: False)
 
     # Algorithm-specific hparam definitions. Each block of code below
     # corresponds to exactly one algorithm.
