@@ -290,11 +290,11 @@ def accuracy(network, loader, weights, device, dataset):
 
     return float(compute_acc), float(compute_f1), float(overlap_class_acc), float(non_overlap_class_acc)
 
-def get_tsne_data(network, loader, device, domain, n=-1):
+def get_tsne_data(network, loader, device, domain, is_test_env, n=-1):
     df = pd.DataFrame({'latent_vector' : [], 'prediction' : [], 
                        'class' : [], 'domain' : []})
 
-    is_test = 1 if loader.dataset.is_test_env else 0
+    is_test = 1 if is_test_env else 0
 
     zs = []
     ps = []
@@ -327,7 +327,7 @@ def get_tsne_data(network, loader, device, domain, n=-1):
 
 def get_tsne_plot(path):
 
-    df = pd.read_csv(path)
+    df = pd.read_pickle(path)
 
     print("began PCA and TSNE")
     pca = PCA(n_components=48) 

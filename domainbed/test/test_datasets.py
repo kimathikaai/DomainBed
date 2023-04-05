@@ -29,18 +29,22 @@ def get_overlap_params() -> List[Tuple[str, str, int, List[int]]]:
     dataset_overlapping_classes = {
         "PACS": {0: [], 33: [2, 4], 66: [0, 2, 3, 4, 5], 100: list(range(7))},
         "VLCS": {0: [], 33: [2, 3], 66: [0, 2, 3, 4], 100: list(range(5))},
+        "WILDSCamelyon": {0: [], 33: [0, 1], 100: list(range(2))},
         "OfficeHome": {
             0: [],
             33: list(range(14, 30)) + list(range(35, 44)),
             66: list(range(5,38)) + list(range(27,44)),
             100: list(range(65)),
         },
+                
     }
-    num_domains = {"PACS": 4, "VLCS": 4, "OfficeHome": 4}
+    num_domains = {"PACS": 4, "VLCS": 4, "OfficeHome": 4, "WILDSCamelyon": 6}
 
     params = []
     for dataset, overlapping_classes_dict in dataset_overlapping_classes.items():
         for overlap, classes in overlapping_classes_dict.items():
+            if dataset == "WILDSCamelyon" and overlap == 66:
+                continue
             for test_env in range(num_domains[dataset]):
                 id = dataset + str(overlap) + f"_test_{test_env}"
                 params.append(
