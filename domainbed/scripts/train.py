@@ -241,11 +241,13 @@ if __name__ == "__main__":
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
             for name, loader, weights in evals:
                 metric_values = misc.accuracy(algorithm, loader, weights, device, dataset)
+                domain_idx = name[3] # env{domain_idx}_{rest_of_string} is how name is formatted
+                is_test_loader = True if domain_idx in args.test_envs else False
 
-                if step == n_steps - 1:
+                if True: #step == n_steps - 1:
                     # Only get tsne data for last step
                     df_domain = misc.get_tsne_data(algorithm, loader, device, 
-                                            name, n=args.tsne_data_lim)
+                                            domain_idx, is_test_loader, n=args.tsne_data_lim)
                     tsne_dfs.append(df_domain)
 
                 acc, f1, overlap_class_acc, non_overlap_class_acc = metric_values
@@ -254,9 +256,10 @@ if __name__ == "__main__":
                 results[name+'_nacc'] = non_overlap_class_acc
                 results[name+'_oacc'] = overlap_class_acc
             
-            if step == n_steps - 1:
+            if True: #step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
-                tsne_df.to_csv(os.path.join(args.output_dir, f'tsne_data_{step}.csv'))
+                tsne_df.to_pickle(os.path.join(args.output_dir, f'tsne_data.pickle'))
+                print(os.path.join(args.output_dir, f'tsne_data.pickle'))
 
             results['mem_gb'] = torch.cuda.max_memory_allocated() / (1024.*1024.*1024.)
 
