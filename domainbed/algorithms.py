@@ -53,7 +53,7 @@ ALGORITHMS = [
     'CausIRL_CORAL',
     'CausIRL_MMD',
     'Intra',
-    'XDom',
+    'XDomAdversary',
     'SupCon',
     'Intra_XDom'
 ]
@@ -2013,6 +2013,11 @@ class AbstractXDom(ERM):
             nn.Linear(encoder_output, 256),
         )
 
+        # adversarial network
+        self.domain_classifier = Discriminator(
+            in_dim=encoder_output, num_domains=num_domains - 1
+        )
+
         def weight_init(m):
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
@@ -2020,12 +2025,14 @@ class AbstractXDom(ERM):
                     nn.init.zeros_(m.bias)
 
         self.projector.apply(weight_init)
+        self.domain_classifier.apply(weight_init)
 
         self.optimizer = torch.optim.Adam(
             (
                 list(self.featurizer.parameters())
                 + list(self.classifier.parameters())
                 + list(self.projector.parameters())
+                + list(self.domain_classifier.parameters())
             ),
             lr=self.hparams["lr"],
             weight_decay=self.hparams["weight_decay"],
@@ -2105,6 +2112,7 @@ class AbstractXDom(ERM):
         # check SelfReg
 
         num_domains = len(minibatches)
+        inputs = [xi for xi, _ in minibatches]
         features = [self.featurizer(xi) for xi, _ in minibatches]
 
         projections = [F.normalize(self.projector(fi)) for fi in features]
@@ -2124,6 +2132,7 @@ class AbstractXDom(ERM):
                     d[d == old] = new
 
         return {
+            "inputs": inputs,
             "features": features,
             "projections": projections,
             "classifs": classifs,
@@ -2186,17 +2195,55 @@ class Intra(AbstractXDom):
         }
 
 
-class XDom(AbstractXDom):
+class ReverseLayerF(autograd.Function):
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        output = grad_output.neg() * ctx.alpha
+        return output, None
+
+
+class Discriminator(nn.Module):
+    """Discriminator model for source domain."""
+
+    def __init__(self, in_dim, num_domains):
+        """Init discriminator."""
+        super(Discriminator, self).__init__()
+
+        self.layer = nn.Sequential(
+            nn.Linear(in_dim, in_dim // 2),
+            nn.ReLU(),
+            nn.Linear(in_dim // 2, in_dim // 4),
+            nn.ReLU(),
+            nn.Linear(in_dim // 4, num_domains)
+            # nn.LogSoftmax(dim=1)
+        )
+
+    def forward(self, input):
+        """Forward the discriminator."""
+        out = self.layer(input)
+        return out
+
+
+class XDomAdversary(AbstractXDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomAdversary, self).__init__(input_shape, num_classes, num_domains, hparams)
 
         # hparams
-        self.lmbd = hparams["lambda"]
+        self.xdom_lmbd = hparams["xdom_lmbd"]
+        self.disc_lmbd = hparams["disc_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
+        self.step_counter = 0
 
     def update(self, minibatches, unlabeled=None):
         values = self.preprocess(minibatches)
+        self.step_counter += 1
 
+        inputs = torch.cat(values["inputs"])
         domains = torch.cat(values["domains"])
         targets = torch.cat(values["targets"])
         classifs = torch.cat(values["classifs"])
@@ -2216,9 +2263,17 @@ class XDom(AbstractXDom):
             alpha=alpha,
         )
 
+        # discriminator
+        p = float(self.step_counter) / 1000
+        disc_alpha = 2.0 / (1.0 + np.exp(-10 * p)) - 1
+        disc_out = self.domain_classifier(
+            ReverseLayerF.apply(self.featurizer(inputs), disc_alpha)
+        )
+        disc_loss = F.cross_entropy(disc_out, domains)
+
         class_loss = F.cross_entropy(classifs, targets)
 
-        loss = class_loss + self.lmbd * xdom_loss
+        loss = class_loss + self.xdom_lmbd * xdom_loss + self.disc_lmbd * disc_loss
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2228,15 +2283,16 @@ class XDom(AbstractXDom):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
+            "disc_loss": disc_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
 
 
-class SupCon(XDom):
-    def __init__(self, input_shape, num_classes, num_domains, hparams):
-        hparams["xda_alpha"] = 1
-        super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
+# class SupCon(XDom):
+#     def __init__(self, input_shape, num_classes, num_domains, hparams):
+#         hparams["xda_alpha"] = 1
+#         super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
 class Intra_XDom(AbstractXDom):
