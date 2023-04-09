@@ -2015,7 +2015,7 @@ class AbstractXDom(ERM):
 
         # adversarial network
         self.domain_classifier = Discriminator(
-            in_dim=encoder_output, num_domains=num_domains - 1
+            in_dim=encoder_output, num_domains=num_domains
         )
 
         def weight_init(m):
