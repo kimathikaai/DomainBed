@@ -357,6 +357,20 @@ def get_tsne_plot(path):
 
     return fig
 
+def get_tsne_df(path):
+
+    df = pd.read_pickle(path)
+
+    pca = PCA(n_components=48) 
+    zs = np.array(list(df['latent_vector']))
+    pca.fit(zs)
+
+    zs = pca.transform(zs)
+    tsne = TSNE(n_components=2, perplexity=10)
+    df['tsne_embeddings'] = list(tsne.fit_transform(zs))
+
+    return df
+
 
 class Tee:
     def __init__(self, fname, mode="a"):
