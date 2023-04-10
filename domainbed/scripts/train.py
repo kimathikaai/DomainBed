@@ -251,10 +251,10 @@ if __name__ == "__main__":
                     tsne_dfs.append(df_domain)
 
                 acc, f1, overlap_class_acc, non_overlap_class_acc = metric_values
-                results[name+'_acc'] = acc
-                results[name+'_f1'] = f1
-                results[name+'_nacc'] = non_overlap_class_acc
-                results[name+'_oacc'] = overlap_class_acc
+                results[name+'_acc'] = float(acc)
+                results[name+'_f1'] = float(f1)
+                results[name+'_nacc'] = float(non_overlap_class_acc)
+                results[name+'_oacc'] = float(overlap_class_acc)
             
             if True: #step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
