@@ -256,7 +256,7 @@ if __name__ == "__main__":
                 results[name+'_nacc'] = float(non_overlap_class_acc)
                 results[name+'_oacc'] = float(overlap_class_acc)
             
-            if True: #step == n_steps - 1:
+            if step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
                 tsne_df.to_pickle(os.path.join(args.output_dir, f'tsne_data.pickle'))
                 print(os.path.join(args.output_dir, f'tsne_data.pickle'))
