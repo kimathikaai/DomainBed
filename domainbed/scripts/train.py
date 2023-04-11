@@ -244,7 +244,7 @@ if __name__ == "__main__":
                 domain_idx = name[3] # env{domain_idx}_{rest_of_string} is how name is formatted
                 is_test_loader = True if domain_idx in args.test_envs else False
 
-                if True: #step == n_steps - 1:
+                if step == n_steps - 1:
                     # Only get tsne data for last step
                     df_domain = misc.get_tsne_data(algorithm, loader, device, 
                                             domain_idx, is_test_loader, n=args.tsne_data_lim)
