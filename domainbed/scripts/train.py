@@ -50,9 +50,10 @@ if __name__ == "__main__":
     parser.add_argument('--skip_model_save', action='store_true')
     parser.add_argument('--save_model_every_checkpoint', action='store_true')
 
-    parser.add_argument('--overlap', type=int)
     parser.add_argument('--tsne_data_lim', type=int, default=-1,
         help='number of datapoints per domain for tsne plots (-1 for no limit)')
+    parser.add_argument('--overlap', type=str, choices=datasets.OVERLAP_TYPES)
+    parser.add_argument('--overlap_seed', type=int, default = 0)
 
     args = parser.parse_args()
 
@@ -106,7 +107,8 @@ if __name__ == "__main__":
 
     if args.dataset in vars(datasets):
         dataset = vars(datasets)[args.dataset](args.data_dir,
-            args.test_envs, hparams, class_overlap_id = args.overlap)
+            args.test_envs, hparams, overlap = args.overlap, 
+            overlap_seed=args.overlap_seed)
     else:
         raise NotImplementedError
 
