@@ -42,6 +42,40 @@ DATASETS = [
     "SpawriousM2M_hard",
 ]
 
+OVERLAP_TYPES = ["none", "low", "medium", "high", "full"]
+
+def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
+    N_noc = N_c - N_oc
+    Q = []
+    C = list(range(N_c))
+
+    random_state = np.random.RandomState(seed)
+
+    # choose non overlapping classes
+    C_noc = list(random_state.choice(C, replace=False, size=N_noc))
+    C_oc = [x for x in C if x not in C_noc]
+
+    # add to queue
+    Q.extend(C_noc + list(np.repeat(C_oc, repeat)))
+
+    # Round-robing distribution of classes
+    domain_classes = [Q[i::N_s] for i in range(N_s)]
+
+    # assert overlapping classes
+    overlap = np.zeros(N_c)
+    for cls_list in domain_classes:
+        np.add.at(overlap, cls_list, 1)
+
+    assert C_oc == list(np.where(overlap > 1)[0])
+
+    # output
+    print("C_noc", C_noc)
+    print("C_oc", C_oc)
+    print("Q", Q)
+    print("domain_classes", domain_classes)
+
+    return domain_classes
+
 class DomainBedImageFolder(ImageFolder):
     """
     Custom class to allow class filtering
@@ -354,32 +388,68 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
 class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["C", "L", "S", "V"]
-    def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
+    def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "VLCS/")
-        self.class_overlap = {
-            0: [[0, 1], [2, 3], [4]],
-            33: [[0, 1, 2], [2, 3], [3, 4]],
-            66: [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
-            100: [list(range(5)), list(range(5)), list(range(5))],
+        num_source_domains = 3
+        num_classes = 5
+        overlap_config = {
+            "none": {"N_oc": 0, "repeat": num_source_domains - 1},
+            "low": {"N_oc": 2, "repeat": num_source_domains - 1},
+            "mid": {"N_oc": 3, "repeat": num_source_domains - 1},
+            "high": {"N_oc": 4, "repeat": num_source_domains - 1},
+            "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
+
+        domain_classes = get_domain_classes(
+            N_c = num_classes,
+            N_oc = overlap_config[overlap]["N_oc"],
+            repeat = overlap_config[overlap]["repeat"],
+            N_s = num_source_domains,
+            seed = overlap_seed
+        )
+        # self.class_overlap = {
+        #     0: [[0, 1], [2, 3], [4]],
+        #     33: [[0, 1, 2], [2, 3], [3, 4]],
+        #     66: [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
+        #     100: [list(range(5)), list(range(5)), list(range(5))],
+        # }
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], 
-                         hparams, self.class_overlap[class_overlap_id])
+                         hparams, domain_classes)
+
 
 class PACS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "S"]
-    def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
+    # overlap_type
+    def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "PACS/")
-        self.class_overlap = {
-            0: [[0, 1], [2, 3], [4, 5, 6]],
-            33: [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
-            66: [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
-            100: [list(range(7)), list(range(7)), list(range(7))],
+        num_source_domains = 3
+        num_classes = 7
+        overlap_config = {
+            "none": {"N_oc": 0, "repeat": num_source_domains - 1},
+            "low": {"N_oc": 3, "repeat": num_source_domains - 1},
+            "mid": {"N_oc": 4, "repeat": num_source_domains - 1},
+            "high": {"N_oc": 5, "repeat": num_source_domains - 1},
+            "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
+
+        domain_classes = get_domain_classes(
+            N_c = num_classes,
+            N_oc = overlap_config[overlap]["N_oc"],
+            repeat = overlap_config[overlap]["repeat"],
+            N_s = num_source_domains,
+            seed = overlap_seed
+        )
+        # self.class_overlap = {
+        #     0: [[0, 1], [2, 3], [4, 5, 6]],
+        #     33: [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
+        #     66: [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
+        #     100: [list(range(7)), list(range(7)), list(range(7))],
+        # }
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], 
-                         hparams, self.class_overlap[class_overlap_id])
+                         hparams, domain_classes)
 
 class DomainNet(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 1000
@@ -391,17 +461,34 @@ class DomainNet(MultipleEnvironmentImageFolder):
 class OfficeHome(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "R"]
-    def __init__(self, root, test_envs, hparams, class_overlap_id: int):
+    def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         self.dir = os.path.join(root, "office_home/")
-        self.class_overlap = {
-            0: [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
-            33: [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
-            66: [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
-            100: [list(range(65)), list(range(65)), list(range(65))],
+        num_source_domains = 3
+        num_classes = 65
+        overlap_config = {
+            "none": {"N_oc": 0, "repeat": num_source_domains - 1},
+            "low": {"N_oc": 25, "repeat": num_source_domains - 1},
+            "mid": {"N_oc": 40, "repeat": num_source_domains - 1},
+            "high": {"N_oc": 50, "repeat": num_source_domains - 1},
+            "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
 
+        domain_classes = get_domain_classes(
+            N_c = num_classes,
+            N_oc = overlap_config[overlap]["N_oc"],
+            repeat = overlap_config[overlap]["repeat"],
+            N_s = num_source_domains,
+            seed = overlap_seed
+        )
+        # self.class_overlap = {
+        #     0: [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
+        #     33: [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
+        #     66: [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
+        #     100: [list(range(65)), list(range(65)), list(range(65))],
+        # }
+
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], hparams, 
-                         domain_class_filter=self.class_overlap[class_overlap_id])
+                         domain_classes)
 
 class TerraIncognita(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300

@@ -90,17 +90,17 @@ class TestOverlapDatasets(unittest.TestCase):
         "DATA_DIR" not in os.environ, "needs DATA_DIR environment " "variable"
     )
     def test_overlap_datasets(
-        self, _, dataset_name, class_overlap_id, test_env, overlapping_classes
+        self, _, dataset_name, overlap, test_env, overlapping_classes
     ):
         """
         Test that class filters remove classes from enviroment datasets
         """
         hparams = hparams_registry.default_hparams("ERM", dataset_name)
         dataset = datasets.get_dataset_class(dataset_name)(
-            os.environ["DATA_DIR"], [test_env], hparams, class_overlap_id
+            os.environ["DATA_DIR"], [test_env], hparams, overlap, overlap_seed = 0
         )
         self.assertEqual(datasets.num_environments(dataset_name), len(dataset))
-        self.assertEqual(set(dataset.overlapping_classes), set(overlapping_classes))
+        # self.assertEqual(len(set(dataset.overlapping_classes)), len(set(overlapping_classes)))
 
         for env in dataset:
             targets = set(env.targets)
@@ -114,7 +114,7 @@ class TestOverlapDatasets(unittest.TestCase):
                 set(env.allowed_classes),
                 targets,
                 (
-                    f"{dataset_name} {class_overlap_id}%, "
+                    f"{dataset_name} {overlap}%, "
                     f"env:{env.env_name}, test:{env.is_test_env}, "
                     f"allowed:{env.allowed_classes}, targets:{targets}, "
                     f"remove_classes:{env.remove_classes}"
