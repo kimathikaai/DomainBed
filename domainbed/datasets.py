@@ -42,7 +42,7 @@ DATASETS = [
     "SpawriousM2M_hard",
 ]
 
-OVERLAP_TYPES = ["none", "low", "medium", "high", "full"]
+OVERLAP_TYPES = ["none", "low", "mid", "high", "full"]
 
 def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
     N_noc = N_c - N_oc
