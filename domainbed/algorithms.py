@@ -2436,7 +2436,7 @@ class XMLDG(AbstractXDom):
 
             for network, in_net in zip(self.network_dict.values(), inner_net.values()):
                 grad_inner_j = autograd.grad(
-                    loss_inner_j, in_net.parameters(), allow_unused=True
+                    loss_inner_j, in_net.parameters(), allow_unused=True, retain_graph=True
                 )
                 for p, g_j in zip(network.parameters(), grad_inner_j):
                     if g_j is not None:
