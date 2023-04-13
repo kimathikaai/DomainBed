@@ -9,6 +9,7 @@ import sys
 from collections import OrderedDict
 from numbers import Number
 import operator
+import json
 
 import numpy as np
 import torch
@@ -22,6 +23,16 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
 
 def distance(h1, h2):
     """distance of two networks (h1, h2 are classifiers)"""
