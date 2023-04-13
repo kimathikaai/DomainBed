@@ -2379,7 +2379,7 @@ class XMLDG(AbstractXDom):
                     list(inner_net["featurizer"].parameters())
                     + list(inner_net["classifier"].parameters())
                     + list(inner_net["projector"].parameters())
-                ), 
+                ),
                 lr=self.hparams["lr"],
                 weight_decay=self.hparams["weight_decay"],
             )
@@ -2388,17 +2388,18 @@ class XMLDG(AbstractXDom):
             domains = torch.zeros(len(xi), dtype=torch.uint8).to(xi.device)
             masks = self.get_masks(Y=yi, D=domains)
             intra_loss_i, s, n = self.supcon_loss(
-                projections= inner_net['projector'](inner_net['featurizer'](xi)),
+                projections=F.normalize(
+                    inner_net["projector"](inner_net["featurizer"](xi))
+                ),
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
             )
 
-            inner_obj = (
-                F.cross_entropy(
-                    inner_net['classifier'](inner_net['featurizer'](xi)), yi
-                ) + self.intra_lmbd * intra_loss_i
+            class_loss_i = F.cross_entropy(
+                inner_net["classifier"](inner_net["featurizer"](xi)), yi
             )
+            inner_obj = class_loss_i + self.intra_lmbd * intra_loss_i
 
             inner_opt.zero_grad()
             inner_obj.backward()
@@ -2418,25 +2419,29 @@ class XMLDG(AbstractXDom):
             domains = torch.zeros(len(xj), dtype=torch.uint8).to(xj.device)
             masks = self.get_masks(Y=yj, D=domains)
             intra_loss_j, s, n = self.supcon_loss(
-                projections= inner_net['projector'](inner_net['featurizer'](xj)),
+                projections=F.normalize(
+                    inner_net["projector"](inner_net["featurizer"](xj))
+                ),
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
             )
 
-            # this computes Gj on the clone-network
-            loss_inner_j = (
-                F.cross_entropy(
-                    inner_net['classifier'](inner_net['featurizer'](xj)), yj
-                ) + self.intra_lmbd * intra_loss_j
+            class_loss_j = F.cross_entropy(
+                inner_net["classifier"](inner_net["featurizer"](xj)), yj
             )
+            # this computes Gj on the clone-network
+            loss_inner_j = class_loss_j + self.intra_lmbd * intra_loss_j
 
             # `objective` is populated for reporting purposes
             objective += (self.hparams["mldg_beta"] * loss_inner_j).item()
 
             for network, in_net in zip(self.network_dict.values(), inner_net.values()):
                 grad_inner_j = autograd.grad(
-                    loss_inner_j, in_net.parameters(), allow_unused=True, retain_graph=True
+                    loss_inner_j,
+                    in_net.parameters(),
+                    allow_unused=True,
+                    retain_graph=True,
                 )
                 for p, g_j in zip(network.parameters(), grad_inner_j):
                     if g_j is not None:
