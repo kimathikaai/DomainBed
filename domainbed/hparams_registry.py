@@ -151,6 +151,7 @@ def _hparams(algorithm, dataset, random_seed):
     elif algorithm == "XMLDG":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('mldg_beta', 1., lambda r: 10**r.uniform(-1, 1))
         _hparam('intra_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
         _hparam('n_meta_test', 1, lambda r: 1)
 
