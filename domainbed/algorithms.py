@@ -2405,7 +2405,6 @@ class XMLDG(AbstractXDom):
             )
 
             # xi INTRA LOSS
-            import pdb;pdb.set_trace()
             domains = torch.zeros(len(xi), dtype=torch.uint8).to(xi.device)
             masks = self.get_masks(Y=yi, D=domains)
             intra_loss_i, s, n = self.supcon_loss(
