@@ -56,7 +56,8 @@ ALGORITHMS = [
     'Intra',
     'XDom',
     'SupCon',
-    'Intra_XDom'
+    'Intra_XDom',
+    'XMLDG'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2354,3 +2355,141 @@ class Intra_XDom(AbstractXDom):
             "xdom_loss": xdom_loss.item(),
             "intra_loss": intra_loss.item(),
         }
+
+class XMLDG(AbstractXDom):
+    """
+    Model-Agnostic Meta-Learning
+    Algorithm 1 / Equation (3) from: https://arxiv.org/pdf/1710.03463.pdf
+    Related: https://arxiv.org/pdf/1703.03400.pdf
+    Related: https://arxiv.org/pdf/1910.13580.pdf
+    """
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(XMLDG, self).__init__(input_shape, num_classes, num_domains,
+                                   hparams)
+        self.num_meta_test = hparams['n_meta_test']
+        self.intra_lmbd = hparams["intra_lmbd"]
+
+    def update(self, minibatches, unlabeled=None):
+        """
+        Terms being computed:
+            * Li = Loss(xi, yi, params)
+            * Gi = Grad(Li, params)
+
+            * Lj = Loss(xj, yj, Optimizer(params, grad(Li, params)))
+            * Gj = Grad(Lj, params)
+
+            * params = Optimizer(params, Grad(Li + beta * Lj, params))
+            *        = Optimizer(params, Gi + beta * Gj)
+
+        That is, when calling .step(), we want grads to be Gi + beta * Gj
+
+        For computational efficiency, we do not compute second derivatives.
+        """
+        num_mb = len(minibatches)
+        objective = 0
+
+        self.optimizer.zero_grad()
+        for p in self.network.parameters():
+            if p.grad is None:
+                p.grad = torch.zeros_like(p)
+
+        for (xi, yi), (xj, yj) in split_meta_train_test(minibatches, self.num_meta_test):
+
+            # fine tune clone-network on task "i"
+            inner_net = copy.deepcopy(self.network)
+
+            inner_opt = torch.optim.Adam(
+                inner_net.parameters(),
+                lr=self.hparams["lr"],
+                weight_decay=self.hparams['weight_decay']
+            )
+
+            # xi INTRA LOSS
+            import pdb;pdb.set_trace()
+            domains = torch.zeros(len(xi), dtype=torch.uint8).to(xi.device)
+            masks = self.get_masks(Y=yi, D=domains)
+            intra_loss_i, s, n = self.supcon_loss(
+                projections=inner_net[0](xi),
+                positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
+                negative_mask=masks["same_domain_mask"] * masks["self_mask"],
+                alpha=1,
+            )
+
+            inner_obj = F.cross_entropy(inner_net(xi), yi) + self.intra_lmbd * intra_loss_i
+
+            inner_opt.zero_grad()
+            inner_obj.backward()
+            inner_opt.step()
+
+            # The network has now accumulated gradients Gi
+            # The clone-network has now parameters P - lr * Gi
+            for p_tgt, p_src in zip(self.network.parameters(),
+                                    inner_net.parameters()):
+                if p_src.grad is not None:
+                    p_tgt.grad.data.add_(p_src.grad.data / num_mb)
+
+            # `objective` is populated for reporting purposes
+            objective += inner_obj.item()
+
+            # xj INTRA LOSS
+            domains = torch.zeros(len(xj), dtype=torch.uint8).to(xj.device)
+            masks = self.get_masks(Y=yj, D=domains)
+            intra_loss_j, s, n = self.supcon_loss(
+                projections=inner_net[0](xj),
+                positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
+                negative_mask=masks["same_domain_mask"] * masks["self_mask"],
+                alpha=1,
+            )
+
+            # this computes Gj on the clone-network
+            loss_inner_j = F.cross_entropy(inner_net(xj), yj) + self.intra_lmbd * intra_loss_j
+            grad_inner_j = autograd.grad(loss_inner_j, inner_net.parameters(),
+                allow_unused=True)
+
+            # `objective` is populated for reporting purposes
+            objective += (self.hparams['mldg_beta'] * loss_inner_j).item()
+
+            for p, g_j in zip(self.network.parameters(), grad_inner_j):
+                if g_j is not None:
+                    p.grad.data.add_(
+                        self.hparams['mldg_beta'] * g_j.data / num_mb)
+
+            # The network has now accumulated gradients Gi + beta * Gj
+            # Repeat for all train-test splits, do .step()
+
+        objective /= len(minibatches)
+
+        self.optimizer.step()
+
+        return {'loss': objective}
+
+    # This commented "update" method back-propagates through the gradients of
+    # the inner update, as suggested in the original MAML paper.  However, this
+    # is twice as expensive as the uncommented "update" method, which does not
+    # compute second-order derivatives, implementing the First-Order MAML
+    # method (FOMAML) described in the original MAML paper.
+
+    # def update(self, minibatches, unlabeled=None):
+    #     objective = 0
+    #     beta = self.hparams["beta"]
+    #     inner_iterations = self.hparams["inner_iterations"]
+
+    #     self.optimizer.zero_grad()
+
+    #     with higher.innerloop_ctx(self.network, self.optimizer,
+    #         copy_initial_weights=False) as (inner_network, inner_optimizer):
+
+    #         for (xi, yi), (xj, yj) in random_pairs_of_minibatches(minibatches):
+    #             for inner_iteration in range(inner_iterations):
+    #                 li = F.cross_entropy(inner_network(xi), yi)
+    #                 inner_optimizer.step(li)
+    #
+    #             objective += F.cross_entropy(self.network(xi), yi)
+    #             objective += beta * F.cross_entropy(inner_network(xj), yj)
+
+    #         objective /= len(minibatches)
+    #         objective.backward()
+    #
+    #     self.optimizer.step()
+    #
+    #     return objective
