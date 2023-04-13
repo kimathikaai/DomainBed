@@ -15,6 +15,7 @@ def local_launcher(commands):
     """Launch commands serially on the local machine."""
     for cmd in commands:
         subprocess.call(cmd, shell=True)
+        print('[done]: ', cmd)
 
 def dummy_launcher(commands):
     """
