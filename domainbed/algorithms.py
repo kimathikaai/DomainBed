@@ -2311,6 +2311,7 @@ class Intra_XDom(AbstractXDom):
             "intra_loss": intra_loss.item(),
         }
 
+
 class XMLDG(AbstractXDom):
     """
     Model-Agnostic Meta-Learning
@@ -2318,11 +2319,29 @@ class XMLDG(AbstractXDom):
     Related: https://arxiv.org/pdf/1703.03400.pdf
     Related: https://arxiv.org/pdf/1910.13580.pdf
     """
+
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XMLDG, self).__init__(input_shape, num_classes, num_domains,
-                                   hparams)
-        self.num_meta_test = hparams['n_meta_test']
+        super(XMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.num_meta_test = hparams["n_meta_test"]
         self.intra_lmbd = hparams["intra_lmbd"]
+
+        self.network_dict = nn.ModuleDict(
+            {
+                "featurizer": self.featurizer,
+                "classifier": self.classifier,
+                "projector": self.projector,
+            }
+        )
+
+        self.optimizer = torch.optim.Adam(
+            (
+                list(self.featurizer.parameters())
+                + list(self.classifier.parameters())
+                + list(self.projector.parameters())
+            ),
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
+        )
 
     def update(self, minibatches, unlabeled=None):
         """
@@ -2344,32 +2363,42 @@ class XMLDG(AbstractXDom):
         objective = 0
 
         self.optimizer.zero_grad()
-        for p in self.network.parameters():
-            if p.grad is None:
-                p.grad = torch.zeros_like(p)
+        for network in self.network_dict.values():
+            for p in network.parameters():
+                if p.grad is None:
+                    p.grad = torch.zeros_like(p)
 
-        for (xi, yi), (xj, yj) in split_meta_train_test(minibatches, self.num_meta_test):
-
+        for (xi, yi), (xj, yj) in split_meta_train_test(
+            minibatches, self.num_meta_test
+        ):
             # fine tune clone-network on task "i"
-            inner_net = copy.deepcopy(self.network)
+            inner_net = copy.deepcopy(self.network_dict)
 
             inner_opt = torch.optim.Adam(
-                inner_net.parameters(),
+                (
+                    list(inner_net["featurizer"].parameters())
+                    + list(inner_net["classifier"].parameters())
+                    + list(inner_net["projector"].parameters())
+                ), 
                 lr=self.hparams["lr"],
-                weight_decay=self.hparams['weight_decay']
+                weight_decay=self.hparams["weight_decay"],
             )
 
             # xi INTRA LOSS
             domains = torch.zeros(len(xi), dtype=torch.uint8).to(xi.device)
             masks = self.get_masks(Y=yi, D=domains)
             intra_loss_i, s, n = self.supcon_loss(
-                projections=inner_net[0](xi),
+                projections= inner_net['projector'](inner_net['featurizer'](xi)),
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
             )
 
-            inner_obj = F.cross_entropy(inner_net(xi), yi) + self.intra_lmbd * intra_loss_i
+            inner_obj = (
+                F.cross_entropy(
+                    inner_net['classifier'](inner_net['featurizer'](xi)), yi
+                ) + self.intra_lmbd * intra_loss_i
+            )
 
             inner_opt.zero_grad()
             inner_obj.backward()
@@ -2377,10 +2406,10 @@ class XMLDG(AbstractXDom):
 
             # The network has now accumulated gradients Gi
             # The clone-network has now parameters P - lr * Gi
-            for p_tgt, p_src in zip(self.network.parameters(),
-                                    inner_net.parameters()):
-                if p_src.grad is not None:
-                    p_tgt.grad.data.add_(p_src.grad.data / num_mb)
+            for network, in_net in zip(self.network_dict.values(), inner_net.values()):
+                for p_tgt, p_src in zip(network.parameters(), in_net.parameters()):
+                    if p_src.grad is not None:
+                        p_tgt.grad.data.add_(p_src.grad.data / num_mb)
 
             # `objective` is populated for reporting purposes
             objective += inner_obj.item()
@@ -2389,24 +2418,29 @@ class XMLDG(AbstractXDom):
             domains = torch.zeros(len(xj), dtype=torch.uint8).to(xj.device)
             masks = self.get_masks(Y=yj, D=domains)
             intra_loss_j, s, n = self.supcon_loss(
-                projections=inner_net[0](xj),
+                projections= inner_net['projector'](inner_net['featurizer'](xj)),
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
             )
 
             # this computes Gj on the clone-network
-            loss_inner_j = F.cross_entropy(inner_net(xj), yj) + self.intra_lmbd * intra_loss_j
-            grad_inner_j = autograd.grad(loss_inner_j, inner_net.parameters(),
-                allow_unused=True)
+            loss_inner_j = (
+                F.cross_entropy(
+                    inner_net['classifier'](inner_net['featurizer'](xj)), yj
+                ) + self.intra_lmbd * intra_loss_j
+            )
 
             # `objective` is populated for reporting purposes
-            objective += (self.hparams['mldg_beta'] * loss_inner_j).item()
+            objective += (self.hparams["mldg_beta"] * loss_inner_j).item()
 
-            for p, g_j in zip(self.network.parameters(), grad_inner_j):
-                if g_j is not None:
-                    p.grad.data.add_(
-                        self.hparams['mldg_beta'] * g_j.data / num_mb)
+            for network, in_net in zip(self.network_dict.values(), inner_net.values()):
+                grad_inner_j = autograd.grad(
+                    loss_inner_j, in_net.parameters(), allow_unused=True
+                )
+                for p, g_j in zip(network.parameters(), grad_inner_j):
+                    if g_j is not None:
+                        p.grad.data.add_(self.hparams["mldg_beta"] * g_j.data / num_mb)
 
             # The network has now accumulated gradients Gi + beta * Gj
             # Repeat for all train-test splits, do .step()
@@ -2415,7 +2449,7 @@ class XMLDG(AbstractXDom):
 
         self.optimizer.step()
 
-        return {'loss': objective}
+        return {"loss": objective}
 
     # This commented "update" method back-propagates through the gradients of
     # the inner update, as suggested in the original MAML paper.  However, this
