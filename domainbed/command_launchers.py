@@ -14,6 +14,7 @@ import os
 def local_launcher(commands):
     """Launch commands serially on the local machine."""
     for cmd in commands:
+        print('[starting]: ', cmd)
         subprocess.call(cmd, shell=True)
         print('[done]: ', cmd)
 
