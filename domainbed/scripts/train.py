@@ -15,6 +15,7 @@ import PIL
 import torch
 import torchvision
 import torch.utils.data
+from torch.utils.tensorboard import SummaryWriter
 
 from domainbed import datasets
 from domainbed import hparams_registry
@@ -68,6 +69,10 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok=True)
     sys.stdout = misc.Tee(os.path.join(args.output_dir, 'out.txt'))
     sys.stderr = misc.Tee(os.path.join(args.output_dir, 'err.txt'))
+
+    # create a summary writter
+    tb_writer = SummaryWriter(
+        args.output_dir+f".{args.dataset}.{args.overlap}.{args.test_envs[0]}")
 
     print("Environment:")
     print("\tPython: {}".format(sys.version.split(" ")[0]))
@@ -238,6 +243,7 @@ if __name__ == "__main__":
 
             for key, val in checkpoint_vals.items():
                 results[key] = np.mean(val)
+                tb_writer.add_scalar(key, np.mean(val), step)
 
             tsne_dfs = []
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
@@ -253,10 +259,21 @@ if __name__ == "__main__":
                     tsne_dfs.append(df_domain)
 
                 acc, f1, overlap_class_acc, non_overlap_class_acc = metric_values
-                results[name+'_acc'] = float(acc)
-                results[name+'_f1'] = float(f1)
-                results[name+'_nacc'] = float(non_overlap_class_acc)
-                results[name+'_oacc'] = float(overlap_class_acc)
+                metric_values = {
+                    name+'_acc': float(acc),
+                    name+'_f1': float(f1),
+                    name+'_nacc': float(non_overlap_class_acc),
+                    name+'_oacc': float(overlap_class_acc)
+                }
+                results.update(metric_values)
+
+                # log metrics
+                for key, val in metric_values.items():
+                    tb_writer.add_scalar(key, val, step)
+
+                # log hparams
+                if is_test_loader and "in" in name and step == n_steps - 1: 
+                    tb_writer.add_hparams(hparams,metric_values)
             
             if step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
@@ -288,6 +305,8 @@ if __name__ == "__main__":
             if args.save_model_every_checkpoint:
                 save_checkpoint(f'model_step{step}.pkl')
 
+    tb_writer.flush()
+    tb_writer.close()
     save_checkpoint('model.pkl')
 
     with open(os.path.join(args.output_dir, 'done'), 'w') as f:
