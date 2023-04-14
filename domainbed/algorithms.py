@@ -2361,6 +2361,10 @@ class XMLDG(AbstractXDom):
         """
         num_mb = len(minibatches)
         objective = 0
+        meta_train_objective = 0
+        meta_test_objective = 0
+        meta_train_contrast = 0
+        meta_test_contrast = 0
 
         self.optimizer.zero_grad()
         for network in self.network_dict.values():
@@ -2414,6 +2418,8 @@ class XMLDG(AbstractXDom):
 
             # `objective` is populated for reporting purposes
             objective += inner_obj.item()
+            meta_train_objective += inner_obj.item()
+            meta_train_contrast += intra_loss_i.item()
 
             # xj INTRA LOSS
             domains = torch.zeros(len(xj), dtype=torch.uint8).to(xj.device)
@@ -2435,6 +2441,8 @@ class XMLDG(AbstractXDom):
 
             # `objective` is populated for reporting purposes
             objective += (self.hparams["mldg_beta"] * loss_inner_j).item()
+            meta_test_objective += loss_inner_j.item()
+            meta_test_contrast += intra_loss_j.item()
 
             for network, in_net in zip(self.network_dict.values(), inner_net.values()):
                 grad_inner_j = autograd.grad(
@@ -2454,7 +2462,13 @@ class XMLDG(AbstractXDom):
 
         self.optimizer.step()
 
-        return {"loss": objective}
+        return {
+            "loss": objective,
+            "meta_test_contrast": meta_test_contrast,
+            "meta_test_objective": meta_test_objective,
+            "meta_train_contrast": meta_train_contrast,
+            "meta_train_objective": meta_train_objective
+        }
 
     # This commented "update" method back-propagates through the gradients of
     # the inner update, as suggested in the original MAML paper.  However, this
