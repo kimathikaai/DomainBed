@@ -114,6 +114,7 @@ if __name__ == "__main__":
         dataset = vars(datasets)[args.dataset](args.data_dir,
             args.test_envs, hparams, overlap = args.overlap, 
             overlap_seed=args.overlap_seed)
+        hparams["C_oc"] = dataset.overlapping_classes
     else:
         raise NotImplementedError
 
