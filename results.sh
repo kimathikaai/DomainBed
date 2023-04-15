@@ -2,7 +2,7 @@
 
 dataset='All'
 
-for overlap in 0 33 66 100
+for overlap in mid low high
 do
     input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/'$overlap
 

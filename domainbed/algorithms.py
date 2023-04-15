@@ -55,6 +55,7 @@ ALGORITHMS = [
     'EQRM',
     'Intra',
     'XDom',
+    'XDomError',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2231,14 +2232,22 @@ class Intra(AbstractXDom):
             "zero_p": num_zero_positives.item(),
         }
 
-
-class XDom(AbstractXDom):
+class XDomError(AbstractXDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomError, self).__init__(input_shape, num_classes, num_domains, hparams)
 
         # hparams
-        self.lmbd = hparams["lambda"]
+        self.xdom_lmbd = hparams["xdom_lmbd"]
+        self.error_lmbd = hparams["error_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
+        self.C_oc = hparams["C_oc"]
+
+        # create class masks
+        oc_weight = torch.zeros(num_classes, dtype=torch.bool)
+        oc_weight[self.C_oc] = True
+        noc_weight = ~oc_weight
+        self.oc_weight = oc_weight.type(torch.float)
+        self.noc_weight = noc_weight.type(torch.float)
 
     def update(self, minibatches, unlabeled=None):
         values = self.preprocess(minibatches)
@@ -2262,9 +2271,20 @@ class XDom(AbstractXDom):
             alpha=alpha,
         )
 
+        oc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.oc_weight.to(targets.device)
+        )
+        noc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.noc_weight.to(targets.device)
+        )
+
         class_loss = F.cross_entropy(classifs, targets)
 
-        loss = class_loss + self.lmbd * xdom_loss
+        loss = (
+            class_loss
+            + self.xdom_lmbd * xdom_loss
+            + self.error_lmbd * torch.abs(oc_class_loss - noc_class_loss)
+        )
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2274,10 +2294,16 @@ class XDom(AbstractXDom):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
+            "oc_class_loss": oc_class_loss.item(),
+            "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
 
+class XDom(XDomError):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        self.error_lmbd = 0
+        super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 class SupCon(XDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2512,7 +2538,7 @@ class XMLDG(AbstractXDom):
             "meta_test_contrast": meta_test_contrast,
             "meta_test_objective": meta_test_objective,
             "meta_train_contrast": meta_train_contrast,
-            "meta_train_objective": meta_train_objective
+            "meta_train_objective": meta_train_objective,
         }
 
     # This commented "update" method back-propagates through the gradients of
