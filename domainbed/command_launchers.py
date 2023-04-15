@@ -23,8 +23,11 @@ def dummy_launcher(commands):
     Doesn't run anything; instead, prints each command.
     Useful for testing.
     """
-    for cmd in commands:
-        print(f'Dummy launcher: {cmd}')
+    with open("dummy_sweep.sh", "w") as f:
+        f.write("!#/bin/bash\ngpu=\n\n")
+        for cmd in commands:
+            f.write(f"CUDA_VISIBLE_DEVICES=${{gpu}} {cmd}\n")
+            print(f'Dummy launcher: {cmd}')
 
 def multi_gpu_launcher(commands):
     """
