@@ -250,7 +250,7 @@ if __name__ == "__main__":
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
             for name, loader, weights in evals:
                 metric_values = misc.accuracy(algorithm, loader, weights, device, dataset)
-                domain_idx = name[3] # env{domain_idx}_{rest_of_string} is how name is formatted
+                domain_idx = int(name[3]) # env{domain_idx}_{rest_of_string} is how name is formatted
                 is_test_loader = True if domain_idx in args.test_envs else False
 
                 if step == n_steps - 1:
