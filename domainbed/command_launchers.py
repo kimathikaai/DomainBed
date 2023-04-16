@@ -24,7 +24,7 @@ def dummy_launcher(commands):
     Useful for testing.
     """
     with open("dummy_sweep.sh", "w") as f:
-        f.write("!#/bin/bash\ngpu=\n\n")
+        f.write("#!/bin/bash\ngpu=\n\n")
         for cmd in commands:
             f.write(f"CUDA_VISIBLE_DEVICES=${{gpu}} {cmd}\n")
             print(f'Dummy launcher: {cmd}')
