@@ -243,6 +243,8 @@ if __name__ == "__main__":
             }
 
             for key, val in checkpoint_vals.items():
+                if np.isnan(np.mean(val)):
+                    raise Exception(f"{key}: {np.mean(val)}")
                 results[key] = np.mean(val)
                 tb_writer.add_scalar(key, np.mean(val), step)
 

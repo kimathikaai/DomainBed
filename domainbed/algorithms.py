@@ -2232,6 +2232,7 @@ class Intra(AbstractXDom):
             "zero_p": num_zero_positives.item(),
         }
 
+
 class XDomError(AbstractXDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(XDomError, self).__init__(input_shape, num_classes, num_domains, hparams)
@@ -2277,13 +2278,16 @@ class XDomError(AbstractXDom):
         noc_class_loss = F.cross_entropy(
             classifs, targets, weight=self.noc_weight.to(targets.device)
         )
+        error_loss = oc_class_loss - noc_class_loss
+        if torch.isnan(error_loss):
+            error_loss = torch.tensor(0).to(targets.device)
 
         class_loss = F.cross_entropy(classifs, targets)
 
         loss = (
             class_loss
             + self.xdom_lmbd * xdom_loss
-            + self.error_lmbd * torch.abs(oc_class_loss - noc_class_loss)
+            + self.error_lmbd * torch.abs(error_loss)
         )
 
         self.optimizer.zero_grad()
@@ -2294,16 +2298,17 @@ class XDomError(AbstractXDom):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
-            "oc_class_loss": oc_class_loss.item(),
-            "noc_class_loss": noc_class_loss.item(),
+            "error_loss": error_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
 
 class XDom(XDomError):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         self.error_lmbd = 0
         super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
+
 
 class SupCon(XDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
