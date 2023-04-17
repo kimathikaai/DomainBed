@@ -274,6 +274,7 @@ if __name__ == "__main__":
 
                 # log hparams
                 if is_test_loader and "in" in name and step == n_steps - 1: 
+                    hparams.pop("C_oc") # can't be stored
                     tb_writer.add_hparams(hparams,metric_values)
             
             if step == n_steps - 1:
