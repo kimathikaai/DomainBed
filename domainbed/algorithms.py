@@ -2261,7 +2261,7 @@ class XDomError(AbstractXDom):
 
 class XDom(XDomError):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        self.error_lmbd = 0
+        hparams["error_lmbd"] = 0
         super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
