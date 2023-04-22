@@ -8,6 +8,7 @@ import random
 import sys
 import time
 import uuid
+import copy
 
 import numpy as np
 import pandas as pd
@@ -276,8 +277,15 @@ if __name__ == "__main__":
 
                 # log hparams
                 if is_test_loader and "in" in name and step == n_steps - 1: 
+                    values = {}
+                    # replace name with test
+                    for key, val in metric_values.items():
+                        key = copy.deepcopy(key).replace(name, "test")
+                        values.update({key:val})
+
                     hparams.pop("C_oc") # can't be stored
-                    tb_writer.add_hparams(hparams,metric_values)
+
+                    tb_writer.add_hparams(hparams,values)
             
             if step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
