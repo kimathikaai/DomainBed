@@ -56,6 +56,7 @@ ALGORITHMS = [
     'Intra',
     'XDom',
     'XDomError',
+    'XDomBeta',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2106,7 +2107,8 @@ class AbstractXDom(ERM):
         projections,
         positive_mask,
         negative_mask,
-        alpha: float,
+        alpha: torch.Tensor,
+        beta: torch.Tensor,
         epsilon: float = 1e-6,
     ):
         """
@@ -2131,7 +2133,8 @@ class AbstractXDom(ERM):
         logits = proj_dot - logits_max.detach()
 
         # compute exp per element (i.e. over each cosine similarity)
-        exp_logits = torch.exp(logits) * negative_mask
+        exp_logits = torch.exp(logits) * negative_mask * beta
+        # weigh intra domain negatives higher = same domain different class
 
         # decompose log(exp(x)/y) = x - log(y)
         # y = summation of cos similarities excluding self
@@ -2206,6 +2209,7 @@ class Intra(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
+                beta=1,
             )
 
             intra_loss += l
@@ -2233,14 +2237,15 @@ class Intra(AbstractXDom):
         }
 
 
-class XDomError(AbstractXDom):
+class XDomBase(AbstractXDom):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDomError, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomBase, self).__init__(input_shape, num_classes, num_domains, hparams)
 
         # hparams
         self.xdom_lmbd = hparams["xdom_lmbd"]
         self.error_lmbd = hparams["error_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
+        self.xda_beta = hparams["xda_beta"]
         self.C_oc = hparams["C_oc"]
 
         # create class masks
@@ -2265,11 +2270,17 @@ class XDomError(AbstractXDom):
             + masks["diff_domain_same_class_mask"] * self.xda_alpha
         )
 
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
         xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
             projections=projections,
             positive_mask=masks["same_class_mask"] * masks["self_mask"],
             negative_mask=masks["self_mask"],
             alpha=alpha,
+            beta=beta,
         )
 
         oc_class_loss = F.cross_entropy(
@@ -2303,16 +2314,30 @@ class XDomError(AbstractXDom):
             "zero_p": num_zero_positives.item(),
         }
 
-
-class XDom(XDomError):
+class XDomBeta(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["error_lmbd"] = 0
+        super(XDomBeta, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+
+class XDomError(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams["xda_beta"] = 1
+        super(XDomError, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+
+class XDom(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams["error_lmbd"] = 0
+        hparams["xda_beta"] = 1
         super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
-class SupCon(XDom):
+class SupCon(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["xda_alpha"] = 1
+        hparams["xda_beta"] = 1
+        hparams["error_lmbd"] = 0
         super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
@@ -2335,6 +2360,7 @@ class Intra_XDom(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
+                beta=1
             )
 
             intra_loss += l
@@ -2360,6 +2386,7 @@ class Intra_XDom(AbstractXDom):
             positive_mask=masks["same_class_mask"] * masks["self_mask"],
             negative_mask=masks["self_mask"],
             alpha=alpha,
+            beta=1
         )
 
         return xdom_loss
@@ -2474,6 +2501,7 @@ class XMLDG(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
+                beta=1
             )
 
             class_loss_i = F.cross_entropy(
@@ -2507,6 +2535,7 @@ class XMLDG(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
+                beta=1
             )
 
             class_loss_j = F.cross_entropy(
