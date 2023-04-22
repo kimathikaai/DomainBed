@@ -155,6 +155,13 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
         _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
 
+    elif algorithm == "XDomBeta":
+        _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
+        _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
+        _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
+
     elif algorithm == "XMLDG":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
