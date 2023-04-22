@@ -29,6 +29,29 @@ def dummy_launcher(commands):
             f.write(f"CUDA_VISIBLE_DEVICES=${{gpu}} {cmd}\n")
             print(f'Dummy launcher: {cmd}')
 
+def dummy_multi_files_launcher(commands):
+    """
+    Doesn't run anything; instead, prints each command.
+    Useful for testing.
+    """
+    with open("dummy_sweep_0.sh", "w") as f:
+        f.write("#!/bin/bash\ngpu=0\n\n")
+    with open("dummy_sweep_1.sh", "w") as f:
+        f.write("#!/bin/bash\ngpu=1\n\n")
+    with open("dummy_sweep_2.sh", "w") as f:
+        f.write("#!/bin/bash\ngpu=2\n\n")
+
+    for i, cmd in enumerate(commands):
+        if i < len(commands)//3:
+            file_id = 0
+        elif i < (len(commands)//3) * 2:
+            file_id = 1
+        else:
+            file_id = 2
+        with open(f"dummy_sweep_{file_id}.sh", "a") as f:
+            f.write(f"CUDA_VISIBLE_DEVICES=${{gpu}} {cmd}\n")
+            print(f'Dummy launcher: {cmd}')
+
 def multi_gpu_launcher(commands):
     """
     Launch commands on the local machine, using all GPUs in parallel.
@@ -64,6 +87,7 @@ def multi_gpu_launcher(commands):
 REGISTRY = {
     'local': local_launcher,
     'dummy': dummy_launcher,
+    'dummy_multi': dummy_multi_files_launcher,
     'multi_gpu': multi_gpu_launcher
 }
 
