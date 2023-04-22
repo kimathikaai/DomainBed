@@ -42,7 +42,8 @@ DATASETS = [
     "SpawriousM2M_hard",
 ]
 
-OVERLAP_TYPES = ["none", "low", "mid", "high", "full"]
+OVERLAP_TYPES = ["none", "low", "mid", "high", "full", "0", "33", "66", "100"]
+SPECIAL_OVERLAP_TYPES = ["0", "33", "66", "100"]
 
 def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
     N_noc = N_c - N_oc
@@ -401,19 +402,24 @@ class VLCS(MultipleEnvironmentImageFolder):
             "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
 
-        domain_classes = get_domain_classes(
-            N_c = num_classes,
-            N_oc = overlap_config[overlap]["N_oc"],
-            repeat = overlap_config[overlap]["repeat"],
-            N_s = num_source_domains,
-            seed = overlap_seed
-        )
-        # self.class_overlap = {
-        #     0: [[0, 1], [2, 3], [4]],
-        #     33: [[0, 1, 2], [2, 3], [3, 4]],
-        #     66: [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
-        #     100: [list(range(5)), list(range(5)), list(range(5))],
-        # }
+        special_class_overlap = {
+            "0": [[0, 1], [2, 3], [4]],
+            "33": [[0, 1, 2], [2, 3], [3, 4]],
+            "66": [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
+            "100": [list(range(5)), list(range(5)), list(range(5))],
+        }
+
+        if overlap not in SPECIAL_OVERLAP_TYPES:
+            domain_classes = get_domain_classes(
+                N_c = num_classes,
+                N_oc = overlap_config[overlap]["N_oc"],
+                repeat = overlap_config[overlap]["repeat"],
+                N_s = num_source_domains,
+                seed = overlap_seed
+            )
+        else:
+            domain_classes = special_class_overlap[overlap]
+
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], 
                          hparams, domain_classes)
 
@@ -435,19 +441,24 @@ class PACS(MultipleEnvironmentImageFolder):
             "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
 
-        domain_classes = get_domain_classes(
-            N_c = num_classes,
-            N_oc = overlap_config[overlap]["N_oc"],
-            repeat = overlap_config[overlap]["repeat"],
-            N_s = num_source_domains,
-            seed = overlap_seed
-        )
-        # self.class_overlap = {
-        #     0: [[0, 1], [2, 3], [4, 5, 6]],
-        #     33: [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
-        #     66: [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
-        #     100: [list(range(7)), list(range(7)), list(range(7))],
-        # }
+        special_class_overlap = {
+            "0": [[0, 1], [2, 3], [4, 5, 6]],
+            "33": [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
+            "66": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
+            "100": [list(range(7)), list(range(7)), list(range(7))],
+        }
+
+        if overlap not in SPECIAL_OVERLAP_TYPES:
+            domain_classes = get_domain_classes(
+                N_c = num_classes,
+                N_oc = overlap_config[overlap]["N_oc"],
+                repeat = overlap_config[overlap]["repeat"],
+                N_s = num_source_domains,
+                seed = overlap_seed
+            )
+        else:
+            domain_classes = special_class_overlap[overlap]
+
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], 
                          hparams, domain_classes)
 
@@ -473,19 +484,23 @@ class OfficeHome(MultipleEnvironmentImageFolder):
             "full": {"N_oc": num_classes, "repeat": num_source_domains},
         }
 
-        domain_classes = get_domain_classes(
-            N_c = num_classes,
-            N_oc = overlap_config[overlap]["N_oc"],
-            repeat = overlap_config[overlap]["repeat"],
-            N_s = num_source_domains,
-            seed = overlap_seed
-        )
-        # self.class_overlap = {
-        #     0: [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
-        #     33: [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
-        #     66: [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
-        #     100: [list(range(65)), list(range(65)), list(range(65))],
-        # }
+        special_class_overlap = {
+            "0": [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
+            "33": [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
+            "66": [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
+            "100": [list(range(65)), list(range(65)), list(range(65))],
+        }
+
+        if overlap not in SPECIAL_OVERLAP_TYPES:
+            domain_classes = get_domain_classes(
+                N_c = num_classes,
+                N_oc = overlap_config[overlap]["N_oc"],
+                repeat = overlap_config[overlap]["repeat"],
+                N_s = num_source_domains,
+                seed = overlap_seed
+            )
+        else:
+            domain_classes = special_class_overlap[overlap]
 
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], hparams, 
                          domain_classes)
