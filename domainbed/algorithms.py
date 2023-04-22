@@ -57,6 +57,7 @@ ALGORITHMS = [
     'XDom',
     'XDomError',
     'XDomBeta',
+    'XDomBetaError',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2313,6 +2314,10 @@ class XDomBase(AbstractXDom):
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
+class XDomBetaError(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(XDomBetaError, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 class XDomBeta(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
