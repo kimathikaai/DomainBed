@@ -2,6 +2,7 @@
 
 import itertools
 import numpy as np
+from domainbed import datasets
 
 def get_test_records(records):
     """Given records with a common test env, get the test records (i.e. the
@@ -51,6 +52,16 @@ class SelectionMethod:
         if len(_hparams_accs):
             # get first [0] result and get the self.run_acc dict [0]
             # and return the 'test_acc' value
+            print(
+                "%",
+                _hparams_accs[0][1][0]['args']['algorithm'],
+                _hparams_accs[0][1][0]['args']['dataset'],
+                _hparams_accs[0][1][0]['args']['overlap'],
+                _hparams_accs[0][1][0]['args']['test_envs'],
+                _hparams_accs[0][1][0]['args']['hparams_seed'],
+                _hparams_accs[0][1][0]['args']['output_dir'],
+                _hparams_accs[0][0]
+                  )
             return _hparams_accs[0][0]['test_acc']
         else:
             return None
@@ -86,20 +97,74 @@ class IIDAccuracySelectionMethod(SelectionMethod):
     selec_metric = None
     eval_metric = None
 
+    # @classmethod
+    # def _step_acc(cls, record):
+    #     """Given a single record, return a {val_acc, test_acc} dict."""
+    #     test_env = record['args']['test_envs'][0]
+    #     val_env_keys = []
+    #     for i in itertools.count():
+    #         # because you don't know the number of envs ahead of time
+    #         if f'env{i}_out_{cls.selec_metric}' not in record:
+    #             break
+    #         if i != test_env:
+    #             val_env_keys.append(f'env{i}_out_{cls.selec_metric}')
+    #     test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
+    #     return {
+    #         'val_acc': np.mean([record[key] for key in val_env_keys]), # average of 20% split of train envs
+    #         'test_acc': record[test_in_acc_key] # 80% split of the test env
+    #     } 
+
     @classmethod
     def _step_acc(cls, record):
-        """Given a single record, return a {val_acc, test_acc} dict."""
+        """
+        Given a single record, return a {val_acc, test_acc} dict.
+            macc = weighted average oacc and nacc to get macro-acc
+            vacc = non-weighted average between oacc and nacc
+        """
         test_env = record['args']['test_envs'][0]
+        dataset = vars(datasets)[record['args']['dataset']]
+        overlap = str(record['args']['overlap'])
+
         val_env_keys = []
+        test_env_keys = []
+
+        oacc_weight = dataset.N_OC[overlap]["N_oc"]/dataset.NUM_CLASSES
+        nacc_weight = 1 - oacc_weight
+
+        # print(dataset, overlap, cls.selec_metric, cls.eval_metric)
+
+        if cls.eval_metric == "macc":
+            test_env_keys.append((f'env{test_env}_in_nacc', 2*nacc_weight))
+            test_env_keys.append((f'env{test_env}_in_oacc', 2*oacc_weight))
+            # print("eval",oacc_weight, nacc_weight)
+        elif cls.eval_metric == "vacc":
+            test_env_keys.append((f'env{test_env}_in_nacc', 1))
+            test_env_keys.append((f'env{test_env}_in_oacc', 1))
+            # print("eval",1,1)
+        else:
+            test_env_keys.append((f'env{test_env}_in_{cls.eval_metric}', 1))
+
         for i in itertools.count():
-            if f'env{i}_out_{cls.selec_metric}' not in record:
+            # because you don't know the number of envs ahead of time
+            if f'env{i}_out_nacc' not in record:
                 break
             if i != test_env:
-                val_env_keys.append(f'env{i}_out_{cls.selec_metric}')
-        test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
+                if cls.selec_metric == "macc":
+                    val_env_keys.append((f'env{i}_out_nacc', 2*nacc_weight))
+                    val_env_keys.append((f'env{i}_out_oacc', 2*oacc_weight))
+                    # print("val",oacc_weight, nacc_weight)
+                elif cls.selec_metric == "vacc":
+                    val_env_keys.append((f'env{i}_out_nacc', 1))
+                    val_env_keys.append((f'env{i}_out_oacc', 1))
+                    # print("val",1, 1)
+                else:
+                    val_env_keys.append((f'env{i}_out_{cls.selec_metric}', 1))
+
+        # test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
         return {
-            'val_acc': np.mean([record[key] for key in val_env_keys]), # average of 20% split of train envs
-            'test_acc': record[test_in_acc_key] # 80% split of the test env
+            'val_acc': np.mean([record[key]*weight for key, weight in val_env_keys]), # average of 20% split of train envs
+            'test_acc': np.mean([record[key]*weight for key, weight in test_env_keys]), # average of 80% split of train envs
+            # 'test_acc': record[test_in_acc_key] # 80% split of the test env
         }
 
     @classmethod

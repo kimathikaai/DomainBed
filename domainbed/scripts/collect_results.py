@@ -142,7 +142,7 @@ def print_results_tables(records, selection_method, latex):
         latex=latex)
 
 if __name__ == "__main__":
-    VIABLE_METRICS = ["acc", "nacc", "oacc", "f1"]
+    VIABLE_METRICS = ["acc", "nacc", "oacc", "f1", "macc", "vacc"]
     np.set_printoptions(suppress=True)
 
     parser = argparse.ArgumentParser(
@@ -174,8 +174,8 @@ if __name__ == "__main__":
 
     SELECTION_METHODS = [
         model_selection.IIDAccuracySelectionMethod,
-        model_selection.LeaveOneOutSelectionMethod,
-        model_selection.OracleSelectionMethod,
+        # model_selection.LeaveOneOutSelectionMethod,
+        # model_selection.OracleSelectionMethod,
     ]
 
     for selection_method in SELECTION_METHODS:
