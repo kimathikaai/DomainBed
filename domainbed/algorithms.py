@@ -2,6 +2,7 @@
 
 # fmt: off
 import torch
+from torch._C import dtype
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.autograd as autograd
@@ -58,6 +59,7 @@ ALGORITHMS = [
     'XDomError',
     'XDomBeta',
     'XDomBetaError',
+    'XDomMLDG',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2315,9 +2317,13 @@ class XDomBase(AbstractXDom):
             "zero_p": num_zero_positives.item(),
         }
 
+
 class XDomBetaError(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDomBetaError, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomBetaError, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+
 
 class XDomBeta(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2365,7 +2371,7 @@ class Intra_XDom(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
-                beta=1
+                beta=1,
             )
 
             intra_loss += l
@@ -2391,7 +2397,7 @@ class Intra_XDom(AbstractXDom):
             positive_mask=masks["same_class_mask"] * masks["self_mask"],
             negative_mask=masks["self_mask"],
             alpha=alpha,
-            beta=1
+            beta=1,
         )
 
         return xdom_loss
@@ -2506,7 +2512,7 @@ class XMLDG(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
-                beta=1
+                beta=1,
             )
 
             class_loss_i = F.cross_entropy(
@@ -2540,7 +2546,7 @@ class XMLDG(AbstractXDom):
                 positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
                 negative_mask=masks["same_domain_mask"] * masks["self_mask"],
                 alpha=1,
-                beta=1
+                beta=1,
             )
 
             class_loss_j = F.cross_entropy(
@@ -2578,6 +2584,228 @@ class XMLDG(AbstractXDom):
             "meta_test_objective": meta_test_objective,
             "meta_train_contrast": meta_train_contrast,
             "meta_train_objective": meta_train_objective,
+        }
+
+    # This commented "update" method back-propagates through the gradients of
+    # the inner update, as suggested in the original MAML paper.  However, this
+    # is twice as expensive as the uncommented "update" method, which does not
+    # compute second-order derivatives, implementing the First-Order MAML
+    # method (FOMAML) described in the original MAML paper.
+
+    # def update(self, minibatches, unlabeled=None):
+    #     objective = 0
+    #     beta = self.hparams["beta"]
+    #     inner_iterations = self.hparams["inner_iterations"]
+
+    #     self.optimizer.zero_grad()
+
+    #     with higher.innerloop_ctx(self.network, self.optimizer,
+    #         copy_initial_weights=False) as (inner_network, inner_optimizer):
+
+    #         for (xi, yi), (xj, yj) in random_pairs_of_minibatches(minibatches):
+    #             for inner_iteration in range(inner_iterations):
+    #                 li = F.cross_entropy(inner_network(xi), yi)
+    #                 inner_optimizer.step(li)
+    #
+    #             objective += F.cross_entropy(self.network(xi), yi)
+    #             objective += beta * F.cross_entropy(inner_network(xj), yj)
+
+    #         objective /= len(minibatches)
+    #         objective.backward()
+    #
+    #     self.optimizer.step()
+    #
+    #     return objective
+
+
+class XDomMLDG(AbstractXDom):
+    """
+    Model-Agnostic Meta-Learning
+    Algorithm 1 / Equation (3) from: https://arxiv.org/pdf/1710.03463.pdf
+    Related: https://arxiv.org/pdf/1703.03400.pdf
+    Related: https://arxiv.org/pdf/1910.13580.pdf
+    """
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.num_meta_test = hparams["n_meta_test"]
+
+        self.xdom_lmbd = hparams["xdom_lmbd"]
+        self.xda_alpha = hparams["xda_alpha"]
+        self.xda_beta = hparams["xda_beta"]
+        self.mldg_beta = hparams["mldg_beta"]
+
+        self.network_dict = nn.ModuleDict(
+            {
+                "featurizer": self.featurizer,
+                "classifier": self.classifier,
+                "projector": self.projector,
+            }
+        )
+
+        self.optimizer = torch.optim.Adam(
+            (
+                list(self.featurizer.parameters())
+                + list(self.classifier.parameters())
+                + list(self.projector.parameters())
+            ),
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
+        )
+
+    def update(self, minibatches, unlabeled=None):
+        """
+        Terms being computed:
+            * Li = Loss(xi, yi, params)
+            * Gi = Grad(Li, params)
+
+            * Lj = Loss(xj, yj, Optimizer(params, grad(Li, params)))
+            * Gj = Grad(Lj, params)
+
+            * params = Optimizer(params, Grad(Li + beta * Lj, params))
+            *        = Optimizer(params, Gi + beta * Gj)
+
+        That is, when calling .step(), we want grads to be Gi + beta * Gj
+
+        For computational efficiency, we do not compute second derivatives.
+        """
+        num_mb = len(minibatches)
+        n_domains = len(minibatches)
+        objective = 0
+        meta_train_objective = 0
+        meta_test_objective = 0
+        meta_train_contrast = 0
+        meta_test_contrast = 0
+
+        # Select test domain
+        perm = torch.randperm(n_domains).tolist()
+        meta_train = [minibatches[i] for i in perm[:-1]]
+        meta_test = [minibatches[perm[-1]]]
+
+        # get data and labels
+        mtr_x = torch.cat([x for x, _ in meta_train])
+        mtr_y = torch.cat([y for _, y in meta_train])
+        mtr_d = torch.cat(
+            [torch.zeros(dtype=torch.uint8, device=mtr_x.device) + i for i in perm[:-1]]
+        )
+        mt_x = torch.cat([x for x, _ in meta_test])
+        mt_y = torch.cat([y for _, y in meta_test])
+
+        self.optimizer.zero_grad()
+        for network in self.network_dict.values():
+            for p in network.parameters():
+                if p.grad is None:
+                    p.grad = torch.zeros_like(p)
+
+        # --- META-TRAIN
+
+        # META-TRAIN: Get clone-network to fine-tune
+        inner_net = copy.deepcopy(self.network_dict)
+
+        inner_opt = torch.optim.Adam(
+            (
+                list(inner_net["featurizer"].parameters())
+                + list(inner_net["classifier"].parameters())
+                + list(inner_net["projector"].parameters())
+            ),
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
+        )
+
+        # META-TRAIN: Get masks
+        masks = self.get_masks(Y=mtr_y, D=mtr_d)
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        # META-TRAIN: Get meta-train xdom loss
+        mtr_xdom, mtr_positive, mtr_zeros = self.supcon_loss(
+            projections=F.normalize(
+                inner_net["projector"](inner_net["featurizer"](mtr_x))
+            ),
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
+
+        # META-TRAIN: Calculate meta objective
+        mtr_class_loss = F.cross_entropy(
+            inner_net["classifier"](inner_net["featurizer"](mtr_x)), mtr_y
+        )
+        mtr_obj = mtr_class_loss + self.xdom_lmbd * mtr_xdom
+
+        inner_opt.zero_grad()
+        mtr_obj.backward()
+        inner_opt.step()
+
+        # META-TRAIN: Add accumulated gradients
+        # The network has now accumulated gradients Gi
+        # The clone-network has now parameters P - lr * Gi
+        for network, in_net in zip(self.network_dict.values(), inner_net.values()):
+            for p_tgt, p_src in zip(network.parameters(), in_net.parameters()):
+                if p_src.grad is not None:
+                    p_tgt.grad.data.add_(p_src.grad.data / num_mb)
+
+        # --- META-TEST
+        mt_d = torch.zeros(len(mt_y), dtype=torch.uint8, device=mt_y.device)
+        masks = self.get_masks(Y=mt_y, D=mt_d)
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        # META-TEST: Get meta-train xdom loss
+        mt_xdom, mt_positive, mt_zeros = self.supcon_loss(
+            projections=F.normalize(
+                inner_net["projector"](inner_net["featurizer"](mt_x))
+            ),
+            positive_mask=masks["same_domain_same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
+
+        # META-TEST: Calculate meta objective
+        mt_class_loss = F.cross_entropy(
+            inner_net["classifier"](inner_net["featurizer"](mt_x)), mt_y
+        )
+        mt_obj = mt_class_loss + self.xdom_lmbd * mt_xdom
+
+        for network, in_net in zip(self.network_dict.values(), inner_net.values()):
+            mt_grad_inner = autograd.grad(
+                mt_obj,
+                in_net.parameters(),
+                allow_unused=True,
+                retain_graph=True,
+            )
+            for p, g_j in zip(network.parameters(), mt_grad_inner):
+                if g_j is not None:
+                    p.grad.data.add_(self.mldg_beta * g_j.data / num_mb)
+
+        self.optimizer.step()
+
+        return {
+            "loss": mtr_obj + self.mldg_beta * mt_obj,
+            "mt_xdom": mt_xdom,
+            "mtr_xdom": mtr_xdom,
+            "mt_zeros": mt_zeros,
+            "mtr_zeros": mtr_zeros,
+            "mt_class_loss": mt_class_loss,
+            "mtr_class_loss": mtr_class_loss,
+            "mt_positive": mt_positive,
+            "mtr_positive": mtr_positive,
+            "mt_objective": mt_obj,
+            "mtr_objective": mtr_obj,
         }
 
     # This commented "update" method back-propagates through the gradients of
