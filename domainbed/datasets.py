@@ -389,6 +389,14 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
 class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["C", "L", "S", "V"]
+    NUM_CLASSES = 5
+    N_OC = {    
+        "low": {"N_oc": 2},
+        "33": {"N_oc": 2},
+        "mid": {"N_oc": 3},
+        "high": {"N_oc": 4},
+        "66": {"N_oc": 4},
+    }
     def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
         self.dir = os.path.join(root, "VLCS/")
@@ -427,6 +435,15 @@ class VLCS(MultipleEnvironmentImageFolder):
 class PACS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "S"]
+    NUM_CLASSES = 7
+    N_OC = {    
+        "low": {"N_oc": 3},
+        "33": {"N_oc": 2},
+        "mid": {"N_oc": 4},
+        "high": {"N_oc": 5},
+        "66": {"N_oc": 5},
+    }
+
     # overlap_type
     def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         # print(f"[info] {type(self)}, test_envs: {test_envs}, overlap: {class_overlap_id}")
@@ -472,6 +489,14 @@ class DomainNet(MultipleEnvironmentImageFolder):
 class OfficeHome(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "R"]
+    NUM_CLASSES = 65
+    N_OC = {    
+        "low": {"N_oc": 25},
+        "33": {"N_oc": 25},
+        "mid": {"N_oc": 40},
+        "high": {"N_oc": 50},
+        "66": {"N_oc": 50},
+    }
     def __init__(self, root, test_envs, hparams, overlap, overlap_seed):
         self.dir = os.path.join(root, "office_home/")
         num_source_domains = 3
