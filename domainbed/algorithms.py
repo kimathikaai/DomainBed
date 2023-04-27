@@ -2640,7 +2640,10 @@ class XDomMLDG(AbstractXDom):
         mtr_x = torch.cat([x for x, _ in meta_train])
         mtr_y = torch.cat([y for _, y in meta_train])
         mtr_d = torch.cat(
-            [torch.zeros(dtype=torch.uint8, device=mtr_x.device) + i for i in perm[:-1]]
+            [
+                torch.zeros(len(x), dtype=torch.uint8, device=mtr_x.device) + i
+                for i, x in enumerate(mtr_x)
+            ]
         )
         mt_x = torch.cat([x for x, _ in meta_test])
         mt_y = torch.cat([y for _, y in meta_test])
