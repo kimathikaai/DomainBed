@@ -2641,12 +2641,13 @@ class XDomMLDG(AbstractXDom):
         mtr_y = torch.cat([y for _, y in meta_train])
         mtr_d = torch.cat(
             [
-                torch.zeros(len(x), dtype=torch.uint8, device=mtr_x.device) + i
-                for i, x in enumerate(mtr_x)
+                torch.zeros(len(xy), dtype=torch.uint8, device=mtr_y.device) + i
+                for i, xy in enumerate(meta_train)
             ]
         )
         mt_x = torch.cat([x for x, _ in meta_test])
         mt_y = torch.cat([y for _, y in meta_test])
+        mt_d = torch.zeros(len(mt_y), dtype=torch.uint8, device=mt_y.device)
 
         self.optimizer.zero_grad()
         for network in self.network_dict.values():
@@ -2710,7 +2711,6 @@ class XDomMLDG(AbstractXDom):
                     p_tgt.grad.data.add_(p_src.grad.data / num_mb)
 
         # --- META-TEST
-        mt_d = torch.zeros(len(mt_y), dtype=torch.uint8, device=mt_y.device)
         masks = self.get_masks(Y=mt_y, D=mt_d)
         alpha = (
             ~masks["diff_domain_same_class_mask"]
