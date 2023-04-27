@@ -59,6 +59,7 @@ ALGORITHMS = [
     'XDomBeta',
     'XDomBetaError',
     'XDomMLDG',
+    'XDomBetaMLDG',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2573,7 +2574,7 @@ class XMLDG(AbstractXDom):
     #     return objective
 
 
-class XDomMLDG(AbstractXDom):
+class XDomBetaMLDG(AbstractXDom):
     """
     Model-Agnostic Meta-Learning
     Algorithm 1 / Equation (3) from: https://arxiv.org/pdf/1710.03463.pdf
@@ -2582,7 +2583,7 @@ class XDomMLDG(AbstractXDom):
     """
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomBetaMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
 
         self.xdom_lmbd = hparams["xdom_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
@@ -2763,33 +2764,9 @@ class XDomMLDG(AbstractXDom):
             "mtr_objective": mtr_obj.item(),
         }
 
-    # This commented "update" method back-propagates through the gradients of
-    # the inner update, as suggested in the original MAML paper.  However, this
-    # is twice as expensive as the uncommented "update" method, which does not
-    # compute second-order derivatives, implementing the First-Order MAML
-    # method (FOMAML) described in the original MAML paper.
+class XDomMLDG(XDomBetaMLDG):
 
-    # def update(self, minibatches, unlabeled=None):
-    #     objective = 0
-    #     beta = self.hparams["beta"]
-    #     inner_iterations = self.hparams["inner_iterations"]
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams["xda_beta"] = 1
+        super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
 
-    #     self.optimizer.zero_grad()
-
-    #     with higher.innerloop_ctx(self.network, self.optimizer,
-    #         copy_initial_weights=False) as (inner_network, inner_optimizer):
-
-    #         for (xi, yi), (xj, yj) in random_pairs_of_minibatches(minibatches):
-    #             for inner_iteration in range(inner_iterations):
-    #                 li = F.cross_entropy(inner_network(xi), yi)
-    #                 inner_optimizer.step(li)
-    #
-    #             objective += F.cross_entropy(self.network(xi), yi)
-    #             objective += beta * F.cross_entropy(inner_network(xj), yj)
-
-    #         objective /= len(minibatches)
-    #         objective.backward()
-    #
-    #     self.optimizer.step()
-    #
-    #     return objective
