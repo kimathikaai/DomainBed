@@ -2670,11 +2670,6 @@ class XDomMLDG(AbstractXDom):
         """
         num_mb = len(minibatches)
         n_domains = len(minibatches)
-        objective = 0
-        meta_train_objective = 0
-        meta_test_objective = 0
-        meta_train_contrast = 0
-        meta_test_contrast = 0
 
         # Select test domain
         perm = torch.randperm(n_domains).tolist()
@@ -2690,9 +2685,12 @@ class XDomMLDG(AbstractXDom):
                 for i, xy in enumerate(meta_train)
             ]
         )
+        print("[info] ",mtr_d.shape, mtr_y.shape, mtr_x.shape)
+
         mt_x = torch.cat([x for x, _ in meta_test])
         mt_y = torch.cat([y for _, y in meta_test])
         mt_d = torch.zeros(len(mt_y), dtype=torch.uint8, device=mt_y.device)
+        print("[info] ",mt_d.shape, mt_y.shape, mt_x.shape)
 
         self.optimizer.zero_grad()
         for network in self.network_dict.values():
