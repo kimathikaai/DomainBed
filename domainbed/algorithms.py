@@ -2628,7 +2628,6 @@ class XDomMLDG(AbstractXDom):
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
-        self.num_meta_test = hparams["n_meta_test"]
 
         self.xdom_lmbd = hparams["xdom_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
