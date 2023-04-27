@@ -2750,17 +2750,17 @@ class XDomMLDG(AbstractXDom):
         self.optimizer.step()
 
         return {
-            "loss": mtr_obj + self.mldg_beta * mt_obj,
-            "mt_xdom": mt_xdom,
-            "mtr_xdom": mtr_xdom,
-            "mt_zeros": mt_zeros,
-            "mtr_zeros": mtr_zeros,
-            "mt_class_loss": mt_class_loss,
-            "mtr_class_loss": mtr_class_loss,
-            "mt_positive": mt_positive,
-            "mtr_positive": mtr_positive,
-            "mt_objective": mt_obj,
-            "mtr_objective": mtr_obj,
+            "loss": (mtr_obj + self.mldg_beta * mt_obj).item(),
+            "mt_xdom": mt_xdom.item(),
+            "mtr_xdom": mtr_xdom.item(),
+            "mt_zeros": mt_zeros.item(),
+            "mtr_zeros": mtr_zeros.item(),
+            "mt_class_loss": mt_class_loss.item(),
+            "mtr_class_loss": mtr_class_loss.item(),
+            "mt_positive": mt_positive.item(),
+            "mtr_positive": mtr_positive.item(),
+            "mt_objective": mt_obj.item(),
+            "mtr_objective": mtr_obj.item(),
         }
 
     # This commented "update" method back-propagates through the gradients of
