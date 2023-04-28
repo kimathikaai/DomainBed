@@ -61,6 +61,8 @@ ALGORITHMS = [
     'XDomBetaError',
     'XDomMLDG',
     'XDomBetaMLDG',
+    'XDomBetaErrorMLDG',
+    'XDomBetaErrorMLDGV2',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2619,7 +2621,7 @@ class XMLDG(AbstractXDom):
     #     return objective
 
 
-class XDomBetaMLDG(AbstractXDom):
+class XDomBetaErrorMLDG(AbstractXDom):
     """
     Model-Agnostic Meta-Learning
     Algorithm 1 / Equation (3) from: https://arxiv.org/pdf/1710.03463.pdf
@@ -2628,12 +2630,24 @@ class XDomBetaMLDG(AbstractXDom):
     """
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDomBetaMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(XDomBetaErrorMLDG, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
 
         self.xdom_lmbd = hparams["xdom_lmbd"]
+        self.mt_error_lmbd = hparams["error_lmbd"]
+        self.mtr_error_lmbd = hparams["error_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
         self.xda_beta = hparams["xda_beta"]
         self.mldg_beta = hparams["mldg_beta"]
+        self.C_oc = hparams["C_oc"]
+
+        # create class masks
+        oc_weight = torch.zeros(num_classes, dtype=torch.bool)
+        oc_weight[self.C_oc] = True
+        noc_weight = ~oc_weight
+        self.oc_weight = oc_weight.type(torch.float)
+        self.noc_weight = noc_weight.type(torch.float)
 
         self.network_dict = nn.ModuleDict(
             {
@@ -2683,7 +2697,7 @@ class XDomBetaMLDG(AbstractXDom):
         mtr_d = torch.cat(
             [
                 torch.zeros(len(y), dtype=torch.uint8, device=mtr_y.device) + i
-                for i, (_,y) in enumerate(meta_train)
+                for i, (_, y) in enumerate(meta_train)
             ]
         )
         # print("[info] ",mtr_d.shape, mtr_y.shape, mtr_x.shape)
@@ -2736,11 +2750,27 @@ class XDomBetaMLDG(AbstractXDom):
             beta=beta,
         )
 
-        # META-TRAIN: Calculate meta objective
-        mtr_class_loss = F.cross_entropy(
-            inner_net["classifier"](inner_net["featurizer"](mtr_x)), mtr_y
+        mtr_pred = inner_net["classifier"](inner_net["featurizer"](mtr_x))
+
+        mtr_class_loss = F.cross_entropy(mtr_pred, mtr_y)
+
+        # META-TRAIN: Error loss
+        mtr_oc_class_loss = F.cross_entropy(
+            mtr_pred, mtr_y, weight=self.oc_weight.to(mtr_y.device)
         )
-        mtr_obj = mtr_class_loss + self.xdom_lmbd * mtr_xdom
+        mtr_noc_class_loss = F.cross_entropy(
+            mtr_pred, mtr_y, weight=self.noc_weight.to(mtr_y.device)
+        )
+        mtr_error_loss = mtr_oc_class_loss - mtr_noc_class_loss
+        if torch.isnan(mtr_error_loss):
+            mtr_error_loss = torch.tensor(0).to(mtr_y.device)
+
+        # META-TRAIN: Calculate meta objective
+        mtr_obj = (
+            mtr_class_loss
+            + self.xdom_lmbd * mtr_xdom
+            + self.mt_error_lmbd * torch.abs(mtr_error_loss)
+        )
 
         inner_opt.zero_grad()
         mtr_obj.backward()
@@ -2777,10 +2807,26 @@ class XDomBetaMLDG(AbstractXDom):
         )
 
         # META-TEST: Calculate meta objective
-        mt_class_loss = F.cross_entropy(
-            inner_net["classifier"](inner_net["featurizer"](mt_x)), mt_y
+        mt_pred = inner_net["classifier"](inner_net["featurizer"](mt_x))
+
+        mt_class_loss = F.cross_entropy(mt_pred, mt_y)
+
+        # META-TEST: Error loss
+        mt_oc_class_loss = F.cross_entropy(
+            mt_pred, mt_y, weight=self.oc_weight.to(mt_y.device)
         )
-        mt_obj = mt_class_loss + self.xdom_lmbd * mt_xdom
+        mt_noc_class_loss = F.cross_entropy(
+            mt_pred, mt_y, weight=self.noc_weight.to(mt_y.device)
+        )
+        mt_error_loss = mt_oc_class_loss - mt_noc_class_loss
+        if torch.isnan(mt_error_loss):
+            mt_error_loss = torch.tensor(0).to(mt_y.device)
+
+        mt_obj = (
+            mt_class_loss
+            + self.xdom_lmbd * mt_xdom
+            + self.mt_error_lmbd * torch.abs(mt_error_loss)
+        )
 
         for network, in_net in zip(self.network_dict.values(), inner_net.values()):
             mt_grad_inner = autograd.grad(
@@ -2807,11 +2853,29 @@ class XDomBetaMLDG(AbstractXDom):
             "mtr_positive": mtr_positive.item(),
             "mt_objective": mt_obj.item(),
             "mtr_objective": mtr_obj.item(),
+            "mt_error_loss": mt_error_loss.item(),
+            "mtr_error_lmbd": mtr_error_loss.item(),
         }
 
-class XDomMLDG(XDomBetaMLDG):
 
+class XDomBetaErrorMLDGV2(XDomBetaErrorMLDG):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(XDomBetaErrorMLDGV2, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+        # Only assert error loss for meta-test
+        self.mtr_error_lmbd = 0
+
+class XDomBetaMLDG(XDomBetaErrorMLDG):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams["error_lmbd"] = 0
+        super(XDomBetaMLDG, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+
+
+class XDomMLDG(XDomBetaErrorMLDG):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["xda_beta"] = 1
+        hparams["error_lmbd"] = 0
         super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
-
