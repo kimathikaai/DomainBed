@@ -88,8 +88,8 @@ label_distribution = {
     'n_noc_test' : list(),
     'total_train' : list(),
     'total_test' : list(),
-    'oc_percent_train': list(),
-    'oc_percent_test': list()
+    'noc_percent_train': list(),
+    'noc_percent_test': list()
 }
 
 for param in params:
@@ -99,19 +99,19 @@ for param in params:
     label_distribution['dataset'].append(dataset_name)
     label_distribution['overlap'].append(overlap)
     label_distribution['test_env'].append(test_env)
-    label_distribution['n_noc_train'].append(
-        train_label_distribution['total'] - train_label_distribution['oc'])
-    label_distribution['n_oc_train'].append(train_label_distribution['oc'])
-    label_distribution['n_noc_test'].append(
-        test_label_distribution['total'] - test_label_distribution['oc'])
-    label_distribution['n_oc_test'].append(test_label_distribution['oc'])
+    label_distribution['n_oc_train'].append(
+        train_label_distribution['total'] - train_label_distribution['noc'])
+    label_distribution['n_noc_train'].append(train_label_distribution['noc'])
+    label_distribution['n_oc_test'].append(
+        test_label_distribution['total'] - test_label_distribution['noc'])
+    label_distribution['n_noc_test'].append(test_label_distribution['noc'])
     label_distribution['total_train'].append(train_label_distribution['total'])
     label_distribution['total_test'].append(test_label_distribution['total'])
-    label_distribution['oc_percent_train'].append(
-        train_label_distribution['oc']*100/train_label_distribution['total']
+    label_distribution['noc_percent_train'].append(
+        train_label_distribution['noc']*100/train_label_distribution['total']
     )
-    label_distribution['oc_percent_test'].append(
-        test_label_distribution['oc']*100/test_label_distribution['total']
+    label_distribution['noc_percent_test'].append(
+        test_label_distribution['noc']*100/test_label_distribution['total']
     )
 
 with open(csv_file_path, 'w', newline='') as file:
