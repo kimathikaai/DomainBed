@@ -115,6 +115,7 @@ for param in params:
     )
 
 with open(csv_file_path, 'w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=label_distribution.keys())
-    writer.writeheader()  
-    writer.writerows([label_distribution]) 
+    writer = csv.writer(file)
+    writer.writerow(label_distribution.keys())  
+    for row in zip(*label_distribution.values()):
+        writer.writerow(row)
