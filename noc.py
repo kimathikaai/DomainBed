@@ -3,12 +3,14 @@
 """Unit tests."""
 
 import os
+import csv
 from typing import List, Tuple
 
 from domainbed import datasets
 from domainbed import hparams_registry
 
 os.environ['DATA_DIR'] = '/home/s42hossa/scratch/dev/data'
+csv_file_path = '/home/s42hossa/scratch/dev/DomainBed/label_distribution.csv'
 
 def get_overlap_params() -> List[Tuple[str, str, int, List[int]]]:
     num_domains = {"PACS": 4, "VLCS": 4, "OfficeHome": 4}
@@ -71,10 +73,48 @@ def get_noc_info(_, dataset_name, overlap, test_env):
     print(overlap)
     print(train_label_distribution)
     print(test_label_distribution)
+
+    return train_label_distribution, test_label_distribution
     
 
 params = get_overlap_params()
+label_distribution = {
+    'dataset' : list(),
+    'overlap' : list(),
+    'test_env' : list(),
+    'n_oc_train' : list(),
+    'n_noc_train' : list(),
+    'n_oc_test' : list(),
+    'n_noc_test' : list(),
+    'total_train' : list(),
+    'total_test' : list(),
+    'oc_percent_train': list(),
+    'oc_percent_test': list()
+}
 
 for param in params:
-    _, dataset_name, overlap, test_env = param
-    get_noc_info(_, dataset_name, overlap, test_env)
+    id, dataset_name, overlap, test_env = param
+    train_label_distribution, test_label_distribution = get_noc_info(id, dataset_name, overlap, test_env)
+
+    label_distribution['dataset'].append(dataset_name)
+    label_distribution['overlap'].append(overlap)
+    label_distribution['test_env'].append(test_env)
+    label_distribution['n_noc_train'].append(
+        train_label_distribution['total'] - train_label_distribution['oc'])
+    label_distribution['n_oc_train'].append(train_label_distribution['oc'])
+    label_distribution['n_noc_test'].append(
+        test_label_distribution['total'] - test_label_distribution['oc'])
+    label_distribution['n_oc_test'].append(test_label_distribution['oc'])
+    label_distribution['total_train'].append(train_label_distribution['total'])
+    label_distribution['total_test'].append(test_label_distribution['total'])
+    label_distribution['oc_percent_train'].append(
+        train_label_distribution['oc']*100/train_label_distribution['total']
+    )
+    label_distribution['oc_percent_test'].append(
+        test_label_distribution['oc']*100/test_label_distribution['total']
+    )
+
+with open(csv_file_path, 'w', newline='') as file:
+    writer = csv.DictWriter(file, fieldnames=label_distribution.keys())
+    writer.writeheader()  
+    writer.writerows([label_distribution]) 
