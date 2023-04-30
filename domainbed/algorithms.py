@@ -60,6 +60,7 @@ ALGORITHMS = [
     'XDomBetaError',
     'XDomMLDG',
     'XDomBetaMLDG',
+    'XDomBetaMLDGV2',
     'XDomBetaErrorMLDG',
     'XDomBetaErrorMLDGV2',
     'SupCon',
@@ -2593,7 +2594,8 @@ class XDomBetaErrorMLDG(AbstractXDom):
         self.mt_error_lmbd = hparams["error_lmbd"]
         self.mtr_error_lmbd = hparams["error_lmbd"]
         self.xda_alpha = hparams["xda_alpha"]
-        self.xda_beta = hparams["xda_beta"]
+        self.mtr_xda_beta = hparams["xda_beta"]
+        self.mt_xda_beta = hparams["xda_beta"]
         self.mldg_beta = hparams["mldg_beta"]
         self.C_oc = hparams["C_oc"]
 
@@ -2691,7 +2693,7 @@ class XDomBetaErrorMLDG(AbstractXDom):
         )
         beta = (
             ~masks["same_domain_diff_class_mask"]
-            + masks["same_domain_diff_class_mask"] * self.xda_beta
+            + masks["same_domain_diff_class_mask"] * self.mtr_xda_beta
         )
 
         # META-TRAIN: Get meta-train xdom loss
@@ -2747,7 +2749,7 @@ class XDomBetaErrorMLDG(AbstractXDom):
         )
         beta = (
             ~masks["same_domain_diff_class_mask"]
-            + masks["same_domain_diff_class_mask"] * self.xda_beta
+            + masks["same_domain_diff_class_mask"] * self.mt_xda_beta
         )
 
         # META-TEST: Get meta-train xdom loss
@@ -2827,6 +2829,14 @@ class XDomBetaMLDG(XDomBetaErrorMLDG):
         super(XDomBetaMLDG, self).__init__(
             input_shape, num_classes, num_domains, hparams
         )
+
+class XDomBetaMLDGV2(XDomBetaErrorMLDG):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        hparams["error_lmbd"] = 0
+        super(XDomBetaMLDGV2, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+        self.mt_xda_beta = 1
 
 
 class XDomMLDG(XDomBetaErrorMLDG):
