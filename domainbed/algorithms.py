@@ -64,6 +64,7 @@ ALGORITHMS = [
     'XDomBetaMLDGV2',
     'XDomBetaErrorMLDG',
     'XDomBetaErrorMLDGV2',
+    'XDomBetaErrorMLDGV3',
     'SupCon',
     'Intra_XDom',
     'XMLDG'
@@ -2867,6 +2868,17 @@ class XDomBetaErrorMLDGV2(XDomBetaErrorMLDG):
         )
         # Only assert error loss for meta-test
         self.mtr_error_lmbd = 0
+
+class XDomBetaErrorMLDGV3(XDomBetaErrorMLDG):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(XDomBetaErrorMLDGV3, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+        # Only assert error loss for meta-test
+        self.mtr_error_lmbd = 0
+
+        # Only apply intra-domain negative weight to meta-train
+        self.mt_xda_beta = 1
 
 class XDomBetaMLDG(XDomBetaErrorMLDG):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
