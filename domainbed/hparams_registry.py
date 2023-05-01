@@ -192,7 +192,7 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
         _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
 
-    elif algorithm == "XDomBetaErrorMLDG" or algorithm == "XDomBetaErrorMLDGV2":
+    elif algorithm in ["XDomBetaErrorMLDG", "XDomBetaErrorMLDGV2", "XDomBetaErrorMLDGV3"]:
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
         _hparam('mldg_beta', 1., lambda r: 10**r.uniform(-1, 1))
