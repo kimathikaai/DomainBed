@@ -2,89 +2,103 @@ import re
 import pathlib
 import pandas as pd
 from typing import List
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+import itertools
 
-VIABLE_SELECTION_METRICS = ['acc', 'f1', 'oacc', 'nacc', 'macc', 'vacc']
+VIABLE_SELECTION_METRICS = ["acc", "f1", "oacc", "nacc", "macc", "vacc"]
 VIABLE_EVALUATION_METRICS = VIABLE_SELECTION_METRICS
+
+AXIS_LABELS = {
+    "nacc": r"$C_{N}$ Accuracy",
+    "oacc": r"$C_{O}$ Accuracy",
+    "av_acc": r"Average ($C_{O},C_{N}$) Accuracy",
+    "macc": "Class-Average Accuracy",
+    "vacc": "rAverage ($C_{O},C_{N}$) Accuracy",
+    "f1": "F1-Score",
+}
 
 
 # file scraping function that returns a row
-    # Inputs: file_path
-    # Returns: row as defined by ROW_TEMPLATE (perform check in function)
+# Inputs: file_path
+# Returns: row as defined by ROW_TEMPLATE (perform check in function)
 def scrape_latex(latex_file_path) -> List[dict]:
-    
     rows = []
-        
+
     def get_header(line):
         header = re.split(
-            "\s+", 
-            re.sub(r"\\textbf{(\w+)}", r"\1", line.replace("&", "").replace(r"\\", "")).strip()
-            )
-        dataset_list = header[1: -1]
+            "\s+",
+            re.sub(
+                r"\\textbf{(\w+)}", r"\1", line.replace("&", "").replace(r"\\", "")
+            ).strip(),
+        )
+        dataset_list = header[1:-1]
         return header, dataset_list
 
     # get selection and evaluation metric
     file_name = pathlib.Path(latex_file_path).stem
-    selection_metric = file_name.split('_')[-2]
-    evaluation_metric = file_name.split('_')[-1]
-    overlap = file_name.split('_')[-3]
-    
-    #print(file_name, selection_metric, evaluation_metric, overlap)
+    selection_metric = file_name.split("_")[-2]
+    evaluation_metric = file_name.split("_")[-1]
+    overlap = file_name.split("_")[-3]
+
+    # print(file_name, selection_metric, evaluation_metric, overlap)
     assert selection_metric in VIABLE_SELECTION_METRICS
     assert evaluation_metric in VIABLE_EVALUATION_METRICS
-    
+
     # read file contents
-    with open(latex_file_path, 'r') as f:
+    with open(latex_file_path, "r") as f:
         found_section = False
         found_table = False
         found_header = False
         found_table_start = False
-            
+
         lines = f.readlines()
         for row_n, line in enumerate(lines):
-            
             # print(row_n,line)
             # get to training-domain model selection section
-            if (re.search("subsection{Model.*training-domain", line) or found_section):
-                #if not found_section: print("*"*10, line)
+            if re.search("subsection{Model.*training-domain", line) or found_section:
+                # if not found_section: print("*"*10, line)
                 found_section = True
-                if (re.search("subsubsection{Averages}", line) or found_table):
-                    #if not found_table: print("*"*10, line)
+                if re.search("subsubsection{Averages}", line) or found_table:
+                    # if not found_table: print("*"*10, line)
                     found_table = True
-                    if (re.search("textbf{Algorithm}", line) or found_header):
+                    if re.search("textbf{Algorithm}", line) or found_header:
                         if not found_header:
                             # therefore first time to find header
                             # get header items
                             header, dataset_list = get_header(line)
-                            #print(header)
-                            #print(dataset_list)
-                            
+                            # print(header)
+                            # print(dataset_list)
+
                             found_header = True
-                            
+
                         # look for table beginning
-                        if ('midrule' in line or found_table_start):
+                        if "midrule" in line or found_table_start:
                             if not found_table_start:
                                 found_table_start = True
                                 continue
-                            
+
                             # don't process after /bottom/rule
-                            if ('bottomrule' in line):
+                            if "bottomrule" in line:
                                 # finished reading table
                                 break
-                            
+
                             # strip the row for each algorithm for
                             # value and std per dataset
                             algo_row = re.split(
                                 "\s+",
-                                line.replace("$\\pm$ ", ""
-                                    ).replace("&", ""
-                                    ).replace(r"\\", ""
-                                    ).strip()
-                                )
+                                line.replace("$\\pm$ ", "")
+                                .replace("&", "")
+                                .replace(r"\\", "")
+                                .strip(),
+                            )
                             algorithm = algo_row.pop(0)
                             average = algo_row.pop()
                             values = algo_row
-                            #print("*"*10, algo_row)
-                            
+                            # print("*"*10, algo_row)
+
                             # Support 'X'
                             org_values = values[:]
                             values = []
@@ -95,23 +109,260 @@ def scrape_latex(latex_file_path) -> List[dict]:
                                     values.append(item)
 
                             for idx, dataset in enumerate(dataset_list):
-                                if values[idx*2] == 'X': continue
-                                if float(values[idx*2]) < 0: continue
-                                algorithm = "POXL" if algorithm == "XDomError" else algorithm
-                                algorithm = "POXL-F" if algorithm == "XDom" else algorithm
-                                algorithm = "POXL-F+B" if algorithm == "XDomBeta" else algorithm
-                                algorithm = "POXL+B" if algorithm == "XDomBetaError" else algorithm
-                                algorithm = "POXL-F-A" if algorithm == "SupCon" else algorithm
+                                if values[idx * 2] == "X":
+                                    continue
+                                if float(values[idx * 2]) < 0:
+                                    continue
+                                algorithm = (
+                                    "POXL" if algorithm == "XDomError" else algorithm
+                                )
+                                algorithm = (
+                                    "POXL-F" if algorithm == "XDom" else algorithm
+                                )
+                                algorithm = (
+                                    "POXL-F+B" if algorithm == "XDomBeta" else algorithm
+                                )
+                                algorithm = (
+                                    "POXL+B"
+                                    if algorithm == "XDomBetaError"
+                                    else algorithm
+                                )
+                                algorithm = (
+                                    "POXL-F-A" if algorithm == "SupCon" else algorithm
+                                )
                                 row = {
-                                    'dataset': dataset, 
-                                    'overlap': overlap, 
-                                    'algorithm': algorithm, 
-                                    'selection_metric': selection_metric, 
-                                    'evaluation_metric': evaluation_metric,
-                                    'selection_value': None,
-                                    'evaluation_value': float(values[idx*2]),
-                                    'selection_std': None,
-                                    'evaluation_std': float(values[idx*2 +1]),
+                                    "dataset": dataset,
+                                    "overlap": overlap,
+                                    "algorithm": algorithm,
+                                    "selection_metric": selection_metric,
+                                    "evaluation_metric": evaluation_metric,
+                                    "selection_value": None,
+                                    "evaluation_value": float(values[idx * 2]),
+                                    "selection_std": None,
+                                    "evaluation_std": float(values[idx * 2 + 1]),
                                 }
                                 rows.append(row)
     return rows
+
+
+import math
+from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import AutoMinorLocator
+
+
+def get_metrics(df, eval_metric, selec_metric, dataset=None, overlap=None):
+    # print(f"({selec_metric}, {eval_metric}, {dataset})")
+    BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL"]
+    OVERLAPS = ["33", "66"]
+    data = df.loc[
+        (df["selection_metric"] == selec_metric)
+        & (df["evaluation_metric"] == eval_metric)
+        & (df["algorithm"].isin(BASELINES))
+    ]
+    if dataset is not None:
+        data = data.loc[df["dataset"] == dataset]
+    if overlap is not None:
+        data = data.loc[df["overlap"] == overlap]
+    else:
+        data = data.loc[df["overlap"].isin(OVERLAPS)]
+
+    data = data.sort_values(by="algorithm", ascending=False).reset_index(drop=True)
+    cols = ["algorithm", "overlap", "dataset", "evaluation_value"]
+    metric_data = (
+        data.groupby("algorithm").mean(numeric_only=True).reset_index(names="algorithm")
+    )
+    return metric_data
+
+
+def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None):
+    """Plot average across overlaps for each dataset"""
+    MARKERS = [
+        "v",
+        "X",
+        ">",
+        "o",
+        "s",
+        "p",
+        "P",
+        "*",
+        "D",
+        "d",
+        "<",
+        "H",
+        "h",
+        "3",
+        "1",
+        "2",
+    ]
+    num_major_ticks = 7
+    algorithm = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "algorithm"
+    ]
+    df_oacc = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_nacc = get_metrics(df, "nacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_acc = get_metrics(df, "acc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_macc = get_metrics(df, "macc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_f1 = get_metrics(df, "f1", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_diff = df_oacc - df_nacc
+    df_ave_acc = (df_oacc + df_nacc) / 2
+    assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
+
+    assert len(MARKERS) >= len(algorithm)
+
+    # dataframe
+    data = (
+        pd.DataFrame(
+            data={
+                "marker": MARKERS[: len(algorithm)],
+                "algorithm": algorithm,
+                "nacc": df_nacc,
+                "oacc": df_oacc,
+                "acc": df_acc,
+                "av_acc": df_ave_acc,
+                "f1": df_f1,
+                "macc": df_macc,
+                "diff": df_diff,
+            }
+        )
+        .sort_values(by="algorithm", ascending=False)
+        .reset_index(drop=True)
+    )
+    # print(data)
+
+    # colour mapping
+    my_cmap = plt.get_cmap("viridis")
+
+    def rescale(row, rows):
+        return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
+
+    # populate scatter plot
+    for index, row in data.iterrows():
+        if "POXL" in row["algorithm"]:
+            color = "khaki"
+        else:
+            color = "darkviolet"
+        s = ax.scatter(
+            x=row[x],
+            y=row[y],
+            # color=my_cmap(rescale(row[color_metric], data[color_metric])),
+            color=color,
+            edgecolor="black",
+            label=row["algorithm"],
+            marker=row["marker"],
+            s=mpl.rcParams["lines.markersize"] ** 2.75,
+        )
+
+    # AXIS LABELS
+    # ax.set_title(f"{dataset}-{selec_metric}")
+    ax.set_title(f"{dataset}")
+    ax.grid(axis="both", which="both")
+    # SET EQUAL AXIS RANGE/VALUES
+    x_min = math.floor(min(data[x])) - 2
+    x_max = math.ceil(max(data[x])) + 2
+    y_min = math.floor(min(data[y])) - 2
+    y_max = math.ceil(max(data[y])) + 2
+
+    ax_min = y_min = x_min = min(y_min, x_min)
+    ax_max = y_max = x_max = max(y_max, x_max)
+    ax_steps = (ax_max - ax_min) / num_major_ticks
+
+    ax.set_xlim(ax_min, ax_max)
+    ax.set_ylim(ax_min, ax_max)
+
+    ax.set_xticks(np.arange(ax_min, ax_max, ax_steps))
+    ax.set_yticks(np.arange(ax_min, ax_max, ax_steps))
+
+    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+
+    ax.get_yaxis().set_major_locator(MaxNLocator(integer=True))
+    ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
+
+    ax.plot([ax_min, ax_max], [ax_min, ax_max], "k--", linewidth=2)
+
+    return ax
+
+
+def stack_plot_results(df, selec_metric, eval_metric):
+    dataset_list = ["PACS", "VLCS", "OfficeHome"]
+    overlap_list = ["33", "66"]
+    color = ["#024b7a", "#44a5c2"]
+
+    fig, ax = plt.subplots(
+        nrows=1,
+        ncols=len(dataset_list),
+        # figsize=(10,10),
+        figsize=(10, 4),
+        sharey=False,
+    )
+
+    for i, dataset in enumerate(dataset_list):
+        data = df.loc[
+            (df["dataset"] == dataset)
+            & (df["selection_metric"] == selec_metric)
+            & (df["evaluation_metric"] == eval_metric)
+            & (df["algorithm"] != "SupCon")
+            &
+            # (df['algorithm'] != 'Intra') &
+            # (df['algorithm'] != 'Intra_XDom') &
+            (df["algorithm"] != "XDomBatch")
+        ].sort_values(by=["algorithm"], ascending=True)
+
+        values = []
+        for overlap in overlap_list:
+            values.append(
+                list(data.loc[(df["overlap"] == overlap)]["evaluation_value"])
+            )
+        values = np.array(values)
+
+        # set_trace()
+        # stack bar charts
+        for j in range(values.shape[0]):
+            ax[i].bar(
+                x=list(data[data["overlap"] == overlap_list[j]]["algorithm"].unique()),
+                height=values[j],
+                bottom=np.sum(values[:j], axis=0),
+                color=color[j],
+                label=overlap_list[j],
+            )
+        ax[i].set_title(dataset)
+        ax[i].set_ylabel = selec_metric
+        ax[i].tick_params(axis="x", labelrotation=90)
+        ax[i].grid(axis="y", which="both")
+        ax[i].yaxis.set_minor_locator(AutoMinorLocator(2))
+
+        if i == 0:
+            handles, labels = ax[i].get_legend_handles_labels()
+            fig.legend(
+                handles,
+                labels,
+                loc="upper center",
+                title="Overlap Cases",
+                ncols=len(overlap_list),
+                bbox_to_anchor=(0.5, 0.93),
+            )
+
+    fig.suptitle(f"(s,e) = ({selec_metric},{eval_metric})")
+    # fig.legend(loc="upper center", title="Overlap Case", ncols=2)
+    fig.tight_layout(pad=3.0, w_pad=1.0)
+    return fig
+
+
+# sl = list(df["selection_metric"].unique())
+# el = list(df["evaluation_metric"].unique())
+# sl_el = itertools.product(sl, el)
+# for s, e in sl_el:
+#     #if e != 'nacc' or s != 'nacc': continue
+#     #if s != 'nacc': continue
+#     if s != e: continue
+#     #stack_plot_results(df=df, selec_metric=s, eval_metric=e).show()
