@@ -161,11 +161,12 @@ class IIDAccuracySelectionMethod(SelectionMethod):
                     val_env_keys.append((f'env{i}_out_{cls.selec_metric}', 1))
 
         # test_in_acc_key = 'env{}_in_{}'.format(test_env, cls.eval_metric)
-        return {
+        results_dict = {
             'val_acc': np.mean([record[key]*weight for key, weight in val_env_keys]), # average of 20% split of train envs
             'test_acc': np.mean([record[key]*weight for key, weight in test_env_keys]), # average of 80% split of train envs
             # 'test_acc': record[test_in_acc_key] # 80% split of the test env
         }
+        return results_dict
 
     @classmethod
     def run_acc(cls, run_records):
