@@ -152,7 +152,7 @@ from matplotlib.ticker import AutoMinorLocator
 
 def get_metrics(df, eval_metric, selec_metric, dataset=None, overlap=None):
     # print(f"({selec_metric}, {eval_metric}, {dataset})")
-    BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL"]
+    BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL", "POXL+B"]
     OVERLAPS = ["33", "66"]
     data = df.loc[
         (df["selection_metric"] == selec_metric)
@@ -162,7 +162,10 @@ def get_metrics(df, eval_metric, selec_metric, dataset=None, overlap=None):
     if dataset is not None:
         data = data.loc[df["dataset"] == dataset]
     if overlap is not None:
-        data = data.loc[df["overlap"] == overlap]
+        if isinstance(overlap, list):
+            data = data.loc[df["overlap"].isin(overlap)]
+        else:
+            data = data.loc[df["overlap"] == overlap]
     else:
         data = data.loc[df["overlap"].isin(OVERLAPS)]
 
@@ -289,6 +292,120 @@ def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None
     ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
 
     ax.plot([ax_min, ax_max], [ax_min, ax_max], "k--", linewidth=2)
+
+    return ax
+
+def plot_overlap_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None):
+    """Plot average across overlaps for each dataset"""
+    MARKERS = [
+        "v",
+        "X",
+        ">",
+        "o",
+        "s",
+        "p",
+        "P",
+        "*",
+        "D",
+        "d",
+        "<",
+        "H",
+        "h",
+        "3",
+        "1",
+        "2",
+    ]
+    num_major_ticks = 7
+    algorithm = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "algorithm"
+    ]
+    df_oacc = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_nacc = get_metrics(df, "nacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_acc = get_metrics(df, "acc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_macc = get_metrics(df, "macc", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_f1 = get_metrics(df, "f1", selec_metric, dataset=dataset, overlap=overlap)[
+        "evaluation_value"
+    ]
+    df_diff = df_oacc - df_nacc
+    df_ave_acc = (df_oacc + df_nacc) / 2
+    assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
+
+    assert len(MARKERS) >= len(algorithm)
+
+    # dataframe
+    data = (
+        pd.DataFrame(
+            data={
+                "marker": MARKERS[: len(algorithm)],
+                "algorithm": algorithm,
+                "nacc": df_nacc,
+                "oacc": df_oacc,
+                "acc": df_acc,
+                "av_acc": df_ave_acc,
+                "f1": df_f1,
+                "macc": df_macc,
+                "diff": df_diff,
+            }
+        )
+        .sort_values(by="algorithm", ascending=False)
+        .reset_index(drop=True)
+    )
+    # print(data)
+
+    # colour mapping
+    my_cmap = plt.get_cmap("viridis")
+
+    def rescale(row, rows):
+        return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
+
+    # populate scatter plot
+    for index, row in data.iterrows():
+        if "POXL" in row["algorithm"]:
+            color = "khaki"
+        else:
+            color = "darkviolet"
+        s = ax.scatter(
+            x=row[x],
+            y=row[y],
+            # color=my_cmap(rescale(row[color_metric], data[color_metric])),
+            color=color,
+            edgecolor="black",
+            label=row["algorithm"],
+            marker=row["marker"],
+            s=mpl.rcParams["lines.markersize"] ** 2.75,
+        )
+
+    # AXIS LABELS
+    ax.set_title(f"{dataset}-{overlap}")
+    # ax.set_title(f"{dataset}")
+    ax.grid(axis="both", which="both")
+    # AXIS RANGE/VALUES
+    # AXIS X
+    x_min = math.floor(min(data[x]))-1
+    x_max = math.ceil(max(data[x]))+1
+    x_steps = (x_max - x_min)/num_major_ticks
+    ax.set_xlim(x_min, x_max)
+    ax.set_xticks(np.arange(x_min, x_max, x_steps))
+    # AXIS Y
+    y_min = math.floor(min(data[y]))-1
+    y_max = math.ceil(max(data[y]))+1
+    y_steps = (y_max - y_min)/num_major_ticks
+    ax.set_ylim(y_min, y_max)
+    ax.set_yticks(np.arange(y_min, y_max, y_steps))
+
+    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
+    
+    ax.get_yaxis().set_major_locator(MaxNLocator(integer=True))
+    ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
 
     return ax
 
