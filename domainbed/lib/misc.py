@@ -24,6 +24,8 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
+from domainbed import algorithms
+
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -317,7 +319,10 @@ def get_tsne_data(network, loader, device, domain, is_test_env, n=-1):
         for x, y in loader:
             x = x.to(device)
             y = y.to(device)
-            z = network.featurizer(x) # SAGNet uses .network_f for featurizer
+            if isinstance(network, algorithms.ARM):
+                z = network.get_features(x)
+            else:
+                z = network.featurizer(x) # SAGNet uses .network_f for featurizer
             p = network.predict(x)
 
             [zs.append(z_i.cpu().numpy()) for z_i in torch.flatten(z, 1)]
