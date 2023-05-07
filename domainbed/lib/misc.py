@@ -23,8 +23,6 @@ from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-from domainbed import algorithms
-
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
