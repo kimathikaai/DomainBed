@@ -319,8 +319,8 @@ def get_tsne_data(network, loader, device, domain, is_test_env, n=-1):
         for x, y in loader:
             x = x.to(device)
             y = y.to(device)
-            if isinstance(network, algorithms.ARM):
-                z = network.get_features(x)
+            if hasattr(network, 'name'):
+                z = network.get_features(x) if network.name == "ARM" else network.featurizer(x)
             else:
                 z = network.featurizer(x) # SAGNet uses .network_f for featurizer
             p = network.predict(x)

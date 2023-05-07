@@ -205,6 +205,7 @@ class ARM(ERM):
                                   hparams)
         self.context_net = networks.ContextNet(original_input_shape)
         self.support_size = hparams['batch_size']
+        self.name = "ARM"
 
     def predict(self, x):
         batch_size, c, h, w = x.shape
