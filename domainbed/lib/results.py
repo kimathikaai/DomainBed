@@ -6,19 +6,64 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+import matplotlib.colors as mcolors
 import itertools
 
 VIABLE_SELECTION_METRICS = ["acc", "f1", "oacc", "nacc", "macc", "vacc"]
 VIABLE_EVALUATION_METRICS = VIABLE_SELECTION_METRICS
+BASELINES = [
+    "SelfReg",
+    "MLDG",
+    "Transfer",
+    "ERM",
+    "CAD",
+    "ARM",
+    "CORAL",
+]
+METHODS = [
+    "POXL",
+    # "POXL-B"
+]
+
+ABLATION = ["POXL", "POXL-ABF", "POXL-BF", "POXL-F", "ERM"]
+
+RENAMES = {
+    "XDomError": "POXL-B",
+    "XDom": "POXL-BF",
+    "XDomBeta": "POXL-F",
+    "XDomBetaError": "POXL",
+    "SupCon": "POXL-ABF",
+}
 
 AXIS_LABELS = {
     "nacc": r"$C_{N}$ Accuracy",
     "oacc": r"$C_{O}$ Accuracy",
     "av_acc": r"Average ($C_{O},C_{N}$) Accuracy",
-    "macc": "Class-Average Accuracy",
+    "macc": "All-Class Accuracy",
     "vacc": "rAverage ($C_{O},C_{N}$) Accuracy",
     "f1": "F1-Score",
+    "33": "low",
+    "66": "high",
 }
+
+MARKERS = [
+    "v",
+    "X",
+    ">",
+    "o",
+    "s",
+    "p",
+    "P",
+    "*",
+    "D",
+    "d",
+    "<",
+    "H",
+    "h",
+    "3",
+    "1",
+    "2",
+]
 
 
 # file scraping function that returns a row
@@ -113,23 +158,9 @@ def scrape_latex(latex_file_path) -> List[dict]:
                                     continue
                                 if float(values[idx * 2]) < 0:
                                     continue
-                                algorithm = (
-                                    "POXL" if algorithm == "XDomError" else algorithm
-                                )
-                                algorithm = (
-                                    "POXL-F" if algorithm == "XDom" else algorithm
-                                )
-                                algorithm = (
-                                    "POXL-F+B" if algorithm == "XDomBeta" else algorithm
-                                )
-                                algorithm = (
-                                    "POXL+B"
-                                    if algorithm == "XDomBetaError"
-                                    else algorithm
-                                )
-                                algorithm = (
-                                    "POXL-F-A" if algorithm == "SupCon" else algorithm
-                                )
+                                if algorithm in RENAMES:
+                                    algorithm = RENAMES[algorithm]
+
                                 row = {
                                     "dataset": dataset,
                                     "overlap": overlap,
@@ -140,6 +171,7 @@ def scrape_latex(latex_file_path) -> List[dict]:
                                     "evaluation_value": float(values[idx * 2]),
                                     "selection_std": None,
                                     "evaluation_std": float(values[idx * 2 + 1]),
+                                    "baseline": 1 if algorithm in BASELINES else 0,
                                 }
                                 rows.append(row)
     return rows
@@ -150,54 +182,112 @@ from matplotlib.ticker import FormatStrFormatter
 from matplotlib.ticker import AutoMinorLocator
 
 
-def get_metrics(df, eval_metric, selec_metric, dataset=None, overlap=None):
+def get_metrics(
+    df, eval_metric, selec_metric, dataset=None, overlap=None, algorithm=None
+):
     # print(f"({selec_metric}, {eval_metric}, {dataset})")
-    BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL", "POXL+B"]
     OVERLAPS = ["33", "66"]
     data = df.loc[
         (df["selection_metric"] == selec_metric)
         & (df["evaluation_metric"] == eval_metric)
-        & (df["algorithm"].isin(BASELINES))
     ]
-    if dataset is not None:
-        data = data.loc[df["dataset"] == dataset]
-    if overlap is not None:
-        if isinstance(overlap, list):
-            data = data.loc[df["overlap"].isin(overlap)]
-        else:
-            data = data.loc[df["overlap"] == overlap]
+    if algorithm is not None:
+        if not isinstance(algorithm, list):
+            algorithm = [algorithm]
+        data = data.loc[data["algorithm"].isin(algorithm)]
     else:
-        data = data.loc[df["overlap"].isin(OVERLAPS)]
+        data = data.loc[data["algorithm"].isin(BASELINES + METHODS)]
 
-    data = data.sort_values(by="algorithm", ascending=False).reset_index(drop=True)
-    cols = ["algorithm", "overlap", "dataset", "evaluation_value"]
+    if dataset is not None:
+        if not isinstance(dataset, list):
+            dataset = [dataset]
+        data = data.loc[data["dataset"].isin(dataset)]
+
+    if overlap is not None:
+        if not isinstance(overlap, list):
+            overlap = [overlap]
+        data = data.loc[data["overlap"].isin(overlap)]
+    else:
+        data = data.loc[data["overlap"].isin(OVERLAPS)]
+
+    data = data.sort_values(by=["baseline", "algorithm"], ascending=False).reset_index(
+        drop=True
+    )
+    # cols = ["algorithm", "overlap", "dataset", "evaluation_value"]
     metric_data = (
         data.groupby("algorithm").mean(numeric_only=True).reset_index(names="algorithm")
     )
     return metric_data
 
 
+def plot_global_dataset(df, ax, selec_metric, x, y):
+    """Plot average across overlaps for each dataset"""
+    baseline = get_metrics(df, "oacc", selec_metric)["baseline"]
+    algorithm = get_metrics(df, "oacc", selec_metric)["algorithm"]
+    df_oacc = get_metrics(df, "oacc", selec_metric)["evaluation_value"]
+    df_nacc = get_metrics(df, "nacc", selec_metric)["evaluation_value"]
+    df_acc = get_metrics(df, "acc", selec_metric)["evaluation_value"]
+    df_macc = get_metrics(df, "macc", selec_metric)["evaluation_value"]
+    df_f1 = get_metrics(df, "f1", selec_metric)["evaluation_value"]
+    df_diff = df_oacc - df_nacc
+    df_ave_acc = (df_oacc + df_nacc) / 2
+    assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
+
+    assert len(MARKERS) >= len(algorithm)
+
+    # dataframe
+    data = (
+        pd.DataFrame(
+            data={
+                "marker": MARKERS[: len(algorithm)],
+                "algorithm": algorithm,
+                "nacc": df_nacc,
+                "oacc": df_oacc,
+                "acc": df_acc,
+                "av_acc": df_ave_acc,
+                "f1": df_f1,
+                "macc": df_macc,
+                "diff": df_diff,
+                "baseline": baseline,
+            }
+        )
+        .sort_values(by=["baseline", "algorithm"], ascending=False)
+        .reset_index(drop=True)
+    )
+    # print(data)
+
+    # colour mapping
+    my_cmap = plt.get_cmap("viridis")
+
+    def rescale(row, rows):
+        return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
+
+    # populate scatter plot
+    for index, row in data.iterrows():
+        if "POXL" in row["algorithm"]:
+            color = "khaki"
+        else:
+            color = "darkviolet"
+        s = ax.scatter(
+            x=row[x],
+            y=row[y],
+            # color=my_cmap(rescale(row[color_metric], data[color_metric])),
+            color=color,
+            edgecolor="black",
+            label=row["algorithm"],
+            marker=row["marker"],
+            s=mpl.rcParams["lines.markersize"] ** 2.1,
+        )
+
+    return data
+
+
 def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None):
     """Plot average across overlaps for each dataset"""
-    MARKERS = [
-        "v",
-        "X",
-        ">",
-        "o",
-        "s",
-        "p",
-        "P",
-        "*",
-        "D",
-        "d",
-        "<",
-        "H",
-        "h",
-        "3",
-        "1",
-        "2",
-    ]
     num_major_ticks = 7
+    baseline = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "baseline"
+    ]
     algorithm = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
         "algorithm"
     ]
@@ -235,9 +325,10 @@ def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None
                 "f1": df_f1,
                 "macc": df_macc,
                 "diff": df_diff,
+                "baseline": baseline,
             }
         )
-        .sort_values(by="algorithm", ascending=False)
+        .sort_values(by=["baseline", "algorithm"], ascending=False)
         .reset_index(drop=True)
     )
     # print(data)
@@ -295,47 +386,29 @@ def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None
 
     return ax
 
-def plot_overlap_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None):
+
+def plot_overlap_dataset(
+    df, dataset, ax, color_metric, selec_metric, x, y, overlap=None
+):
     """Plot average across overlaps for each dataset"""
-    MARKERS = [
-        "v",
-        "X",
-        ">",
-        "o",
-        "s",
-        "p",
-        "P",
-        "*",
-        "D",
-        "d",
-        "<",
-        "H",
-        "h",
-        "3",
-        "1",
-        "2",
+    num_major_ticks = 5
+    baseline = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
+        "baseline"
     ]
-    num_major_ticks = 7
     algorithm = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
         "algorithm"
     ]
-    df_oacc = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
-    df_nacc = get_metrics(df, "nacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
+    df_oacc = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)
+    df_nacc = get_metrics(df, "nacc", selec_metric, dataset=dataset, overlap=overlap)
     df_acc = get_metrics(df, "acc", selec_metric, dataset=dataset, overlap=overlap)[
         "evaluation_value"
     ]
-    df_macc = get_metrics(df, "macc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
+    df_macc = get_metrics(df, "macc", selec_metric, dataset=dataset, overlap=overlap)
     df_f1 = get_metrics(df, "f1", selec_metric, dataset=dataset, overlap=overlap)[
         "evaluation_value"
     ]
-    df_diff = df_oacc - df_nacc
-    df_ave_acc = (df_oacc + df_nacc) / 2
+    # df_diff = df_oacc - df_nacc
+    # df_ave_acc = (df_oacc + df_nacc) / 2
     assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
 
     assert len(MARKERS) >= len(algorithm)
@@ -346,16 +419,20 @@ def plot_overlap_dataset(df, dataset, ax, color_metric, selec_metric, x, y, over
             data={
                 "marker": MARKERS[: len(algorithm)],
                 "algorithm": algorithm,
-                "nacc": df_nacc,
-                "oacc": df_oacc,
+                "nacc": df_nacc["evaluation_value"],
+                "nacc_err": df_nacc["evaluation_std"],
+                "oacc": df_oacc["evaluation_value"],
+                "oacc_err": df_oacc["evaluation_std"],
                 "acc": df_acc,
-                "av_acc": df_ave_acc,
+                # "av_acc": df_ave_acc,
                 "f1": df_f1,
-                "macc": df_macc,
-                "diff": df_diff,
+                "macc": df_macc["evaluation_value"],
+                "macc_err": df_macc["evaluation_std"],
+                # "diff": df_diff,
+                "baseline": baseline,
             }
         )
-        .sort_values(by="algorithm", ascending=False)
+        .sort_values(by=["baseline", "algorithm"], ascending=False)
         .reset_index(drop=True)
     )
     # print(data)
@@ -372,7 +449,17 @@ def plot_overlap_dataset(df, dataset, ax, color_metric, selec_metric, x, y, over
             color = "khaki"
         else:
             color = "darkviolet"
-        s = ax.scatter(
+
+        ax.errorbar(
+            x=row[x],
+            y=row[y],
+            yerr=row[y + "_err"],
+            # xerr=row[x + "_err"],
+            # color="black",
+            color="black",
+            zorder=5,
+        )
+        ax.scatter(
             x=row[x],
             y=row[y],
             # color=my_cmap(rescale(row[color_metric], data[color_metric])),
@@ -381,33 +468,10 @@ def plot_overlap_dataset(df, dataset, ax, color_metric, selec_metric, x, y, over
             label=row["algorithm"],
             marker=row["marker"],
             s=mpl.rcParams["lines.markersize"] ** 2.75,
+            zorder=10,
         )
 
-    # AXIS LABELS
-    ax.set_title(f"{dataset}-{overlap}")
-    # ax.set_title(f"{dataset}")
-    ax.grid(axis="both", which="both")
-    # AXIS RANGE/VALUES
-    # AXIS X
-    x_min = math.floor(min(data[x]))-1
-    x_max = math.ceil(max(data[x]))+1
-    x_steps = (x_max - x_min)/num_major_ticks
-    ax.set_xlim(x_min, x_max)
-    ax.set_xticks(np.arange(x_min, x_max, x_steps))
-    # AXIS Y
-    y_min = math.floor(min(data[y]))-1
-    y_max = math.ceil(max(data[y]))+1
-    y_steps = (y_max - y_min)/num_major_ticks
-    ax.set_ylim(y_min, y_max)
-    ax.set_yticks(np.arange(y_min, y_max, y_steps))
-
-    ax.yaxis.set_minor_locator(AutoMinorLocator(2))
-    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
-    
-    ax.get_yaxis().set_major_locator(MaxNLocator(integer=True))
-    ax.get_xaxis().set_major_locator(MaxNLocator(integer=True))
-
-    return ax
+    return data
 
 
 def stack_plot_results(df, selec_metric, eval_metric):
@@ -433,7 +497,7 @@ def stack_plot_results(df, selec_metric, eval_metric):
             # (df['algorithm'] != 'Intra') &
             # (df['algorithm'] != 'Intra_XDom') &
             (df["algorithm"] != "XDomBatch")
-        ].sort_values(by=["algorithm"], ascending=True)
+        ].sort_values(by=["baseline", "algorithm"], ascending=True)
 
         values = []
         for overlap in overlap_list:
@@ -483,3 +547,160 @@ def stack_plot_results(df, selec_metric, eval_metric):
 #     #if s != 'nacc': continue
 #     if s != e: continue
 #     #stack_plot_results(df=df, selec_metric=s, eval_metric=e).show()
+def plot_results(df, selec_metric, eval_metric, overlap_list, dataset_list):
+    my_cmap = plt.get_cmap("viridis")
+
+    # rescale = lambda y: (y - np.min(y)) / (np.max(y) - np.min(y))
+    # rescale = lambda y: max((y - np.mean(y)) / (np.max(y) - np.mean(y)), 0)
+    def rescale(y):
+        # zero = np.mean(y)
+        zero = sorted(y, reverse=True)[len(y) // 3]
+        # everything above 2 quadrant is colored
+        y = np.array((y - zero) / (np.max(y) - zero))
+        _y = y <= 0
+        _y = np.where(_y)[0]
+        y[_y] = 0
+
+        return y
+
+    fig, ax = plt.subplots(
+        nrows=len(dataset_list),
+        ncols=len(overlap_list),
+        figsize=(8, 10),
+        # figsize=(8,5),
+        sharey=False,
+    )
+
+    if len(dataset_list) == 1:
+        ax = [ax]
+
+    for i, dataset in enumerate(dataset_list):
+        for j, overlap in enumerate(overlap_list):
+            data = df.loc[
+                (df["dataset"] == dataset)
+                & (df["selection_metric"] == selec_metric)
+                & (df["evaluation_metric"] == eval_metric)
+                & (df["overlap"] == overlap)
+            ].sort_values(by=["baseline", "algorithm"], ascending=False)
+
+            ax[i][j].bar(
+                data.algorithm,
+                data.evaluation_value,
+                color=my_cmap(rescale(data.evaluation_value)),
+                width=0.6,
+            )
+
+            # plot_data = df_group.mean()['evaluation_value']
+            # max_algo = plot_data.idxmax()
+            # print(plot_data)
+
+            # plot_data.plot(ax=ax[i][j], kind="bar")
+            ax[i][j].set_title(f"{dataset}-{overlap}")
+            # ax[i][j].set_yticks(np.arange(20,60,5))
+            ax[i][j].yaxis.set_minor_locator(AutoMinorLocator(2))
+            ax[i][j].get_yaxis().set_major_locator(MaxNLocator(integer=True))
+            ax[i][j].set_ylim(
+                min(data.evaluation_value) - 3, max(data.evaluation_value) + 3
+            )
+            # ax[i][j].set_ylim(40, 60)
+            ax[i][j].grid(axis="y", which="both")
+            ax[i][j].tick_params(axis="x", labelrotation=90)
+            # ax[i][j].legend()
+
+    fig.suptitle(f"(s,e) = ({selec_metric},{eval_metric})")
+    fig.tight_layout(pad=1.0, h_pad=2.0)
+    return fig
+
+
+def plot_ablation(df, dataset, ax, algorithm, selec_metric, x, y, overlap, color_metric):
+    """Plot average across overlaps for each dataset"""
+    num_major_ticks = 5
+    baseline = get_metrics(
+        df, "oacc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )["baseline"]
+    algo = get_metrics(
+        df, "oacc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )["algorithm"]
+    df_oacc = get_metrics(
+        df, "oacc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )
+    df_nacc = get_metrics(
+        df, "nacc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )
+    df_acc = get_metrics(
+        df, "acc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )["evaluation_value"]
+    df_macc = get_metrics(
+        df, "macc", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )
+    df_f1 = get_metrics(
+        df, "f1", selec_metric, dataset=dataset, overlap=overlap, algorithm=algorithm
+    )["evaluation_value"]
+    # df_diff = df_oacc - df_nacc
+    # df_ave_acc = (df_oacc + df_nacc) / 2
+    # print( len(df_oacc) , len(df_nacc) , len(df_acc) , len(algo))
+    assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algo)
+
+    assert len(MARKERS) >= len(algo)
+
+    # dataframe
+    data = (
+        pd.DataFrame(
+            data={
+                "marker": MARKERS[: len(algo)],
+                "algorithm": algo,
+                "nacc": df_nacc["evaluation_value"],
+                "nacc_err": df_nacc["evaluation_std"],
+                "oacc": df_oacc["evaluation_value"],
+                "oacc_err": df_oacc["evaluation_std"],
+                "acc": df_acc,
+                # "av_acc": df_ave_acc,
+                "f1": df_f1,
+                "macc": df_macc["evaluation_value"],
+                "macc_err": df_macc["evaluation_std"],
+                # "diff": df_diff,
+                "baseline": baseline,
+            }
+        )
+        .sort_values(by=["baseline", "algorithm"], ascending=False)
+        .reset_index(drop=True)
+    )
+    # print(data)
+
+    # colour mapping
+    my_cmap = plt.get_cmap("viridis")
+
+    def rescale(row, rows):
+        return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
+
+    base_colors = list(mcolors.TABLEAU_COLORS.keys())
+    # populate scatter plot
+    for index, row in data.iterrows():
+        if "POXL" in row["algorithm"]:
+            color = "khaki"
+        else:
+            color = "darkviolet"
+
+        # ax.errorbar(
+        #     x=row[x],
+        #     y=row[y],
+        #     yerr=row[y + "_err"],
+        #     # xerr=row[x + "_err"],
+        #     # color="black",
+        #     color="black",
+        #     zorder=5,
+        # )
+        ax.scatter(
+            x=row[x],
+            y=row[y],
+            # color=my_cmap(rescale(row[color_metric], data[color_metric])),
+            color=base_colors[index],
+            # color=color,
+            edgecolor="black",
+            label=row["algorithm"],
+            marker=row["marker"],
+            s=mpl.rcParams["lines.markersize"] ** 2.75,
+            zorder=10,
+        )
+
+    return data
