@@ -4,6 +4,7 @@ import pandas as pd
 from typing import List
 import numpy as np
 import matplotlib as mpl
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import matplotlib.colors as mcolors
@@ -25,19 +26,19 @@ METHODS = [
     # "POXL-B"
 ]
 
-ABLATION = ["POXL", "POXL-ABF", "POXL-BF", "POXL-F", "ERM"]
+ABLATION = ["POXL", r"POXL\ABF", r"POXL\BF", r"POXL\F", "ERM"]
 
 RENAMES = {
-    "XDomError": "POXL-B",
-    "XDom": "POXL-BF",
-    "XDomBeta": "POXL-F",
+    "XDomError": r"POXL\B",
+    "XDom": r"POXL\BF",
+    "XDomBeta": r"POXL\F",
     "XDomBetaError": "POXL",
-    "SupCon": "POXL-ABF",
+    "SupCon": r"POXL\ABF",
 }
 
 AXIS_LABELS = {
-    "nacc": r"$C_{N}$ Accuracy",
-    "oacc": r"$C_{O}$ Accuracy",
+    "nacc": r"Non-Overlapping ($\mathcal{Y}_{N}$) Accuracy",
+    "oacc": r"Overlapping ($\mathcal{Y}_{O}$) Accuracy",
     "av_acc": r"Average ($C_{O},C_{N}$) Accuracy",
     "macc": "All-Class Accuracy",
     "vacc": "rAverage ($C_{O},C_{N}$) Accuracy",
@@ -52,13 +53,13 @@ MARKERS = [
     ">",
     "o",
     "s",
-    "p",
+    "D",
     "P",
     "*",
-    "D",
+    "H",
     "d",
     "<",
-    "H",
+    "p",
     "h",
     "3",
     "1",
@@ -196,7 +197,7 @@ def get_metrics(
             algorithm = [algorithm]
         data = data.loc[data["algorithm"].isin(algorithm)]
     else:
-        data = data.loc[data["algorithm"].isin(BASELINES + METHODS)]
+        data = data.loc[data["algorithm"].isin(BASELINES + ABLATION)]
 
     if dataset is not None:
         if not isinstance(dataset, list):
@@ -222,13 +223,14 @@ def get_metrics(
 
 def plot_global_dataset(df, ax, selec_metric, x, y):
     """Plot average across overlaps for each dataset"""
-    baseline = get_metrics(df, "oacc", selec_metric)["baseline"]
-    algorithm = get_metrics(df, "oacc", selec_metric)["algorithm"]
-    df_oacc = get_metrics(df, "oacc", selec_metric)["evaluation_value"]
-    df_nacc = get_metrics(df, "nacc", selec_metric)["evaluation_value"]
-    df_acc = get_metrics(df, "acc", selec_metric)["evaluation_value"]
-    df_macc = get_metrics(df, "macc", selec_metric)["evaluation_value"]
-    df_f1 = get_metrics(df, "f1", selec_metric)["evaluation_value"]
+    algorithm_list = BASELINES + METHODS
+    baseline = get_metrics(df, "oacc", selec_metric, algorithm=algorithm_list)["baseline"]
+    algorithm = get_metrics(df, "oacc", selec_metric, algorithm=algorithm_list)["algorithm"]
+    df_oacc = get_metrics(df, "oacc", selec_metric, algorithm=algorithm_list)["evaluation_value"]
+    df_nacc = get_metrics(df, "nacc", selec_metric, algorithm=algorithm_list)["evaluation_value"]
+    df_acc = get_metrics(df, "acc", selec_metric, algorithm=algorithm_list)["evaluation_value"]
+    df_macc = get_metrics(df, "macc", selec_metric, algorithm=algorithm_list)["evaluation_value"]
+    df_f1 = get_metrics(df, "f1", selec_metric, algorithm=algorithm_list)["evaluation_value"]
     df_diff = df_oacc - df_nacc
     df_ave_acc = (df_oacc + df_nacc) / 2
     assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
@@ -285,27 +287,63 @@ def plot_global_dataset(df, ax, selec_metric, x, y):
 def plot_dataset(df, dataset, ax, color_metric, selec_metric, x, y, overlap=None):
     """Plot average across overlaps for each dataset"""
     num_major_ticks = 7
-    baseline = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "baseline"
-    ]
-    algorithm = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "algorithm"
-    ]
-    df_oacc = get_metrics(df, "oacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
-    df_nacc = get_metrics(df, "nacc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
-    df_acc = get_metrics(df, "acc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
-    df_macc = get_metrics(df, "macc", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
-    df_f1 = get_metrics(df, "f1", selec_metric, dataset=dataset, overlap=overlap)[
-        "evaluation_value"
-    ]
+    algorithm_list = BASELINES + ABLATION
+    baseline = get_metrics(
+        df,
+        "oacc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["baseline"]
+    algorithm = get_metrics(
+        df,
+        "oacc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["algorithm"]
+    df_oacc = get_metrics(
+        df,
+        "oacc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["evaluation_value"]
+    df_nacc = get_metrics(
+        df,
+        "nacc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["evaluation_value"]
+    df_acc = get_metrics(
+        df,
+        "acc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["evaluation_value"]
+    df_macc = get_metrics(
+        df,
+        "macc",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["evaluation_value"]
+    df_f1 = get_metrics(
+        df,
+        "f1",
+        selec_metric,
+        dataset=dataset,
+        overlap=overlap,
+        algorithm=algorithm_list,
+    )["evaluation_value"]
     df_diff = df_oacc - df_nacc
     df_ave_acc = (df_oacc + df_nacc) / 2
     assert len(df_oacc) == len(df_nacc) == len(df_acc) == len(algorithm)
@@ -443,10 +481,14 @@ def plot_overlap_dataset(
     def rescale(row, rows):
         return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
 
+    poxl_colors = cm.YlOrRd(np.linspace(0, 1, len(ABLATION)))
+    i_p = len(ABLATION) - 1
     # populate scatter plot
     for index, row in data.iterrows():
         if "POXL" in row["algorithm"]:
+            i_p -= 1
             color = "khaki"
+            color = poxl_colors[i_p]
         else:
             color = "darkviolet"
 
@@ -458,6 +500,7 @@ def plot_overlap_dataset(
             # color="black",
             color="black",
             zorder=5,
+            elinewidth=1,
         )
         ax.scatter(
             x=row[x],
@@ -612,7 +655,9 @@ def plot_results(df, selec_metric, eval_metric, overlap_list, dataset_list):
     return fig
 
 
-def plot_ablation(df, dataset, ax, algorithm, selec_metric, x, y, overlap, color_metric):
+def plot_ablation(
+    df, dataset, ax, algorithm, selec_metric, x, y, overlap, color_metric
+):
     """Plot average across overlaps for each dataset"""
     num_major_ticks = 5
     baseline = get_metrics(
