@@ -262,13 +262,16 @@ if __name__ == "__main__":
                                             domain_idx, is_test_loader, n=args.tsne_data_lim)
                     tsne_dfs.append(df_domain)
 
-                acc, f1, overlap_class_acc, non_overlap_class_acc = metric_values
+                acc, f1, overlap_class_acc, non_overlap_class_acc, per_class_acc = metric_values
                 metric_values = {
                     name+'_acc': float(acc),
                     name+'_f1': float(f1),
                     name+'_nacc': float(non_overlap_class_acc),
                     name+'_oacc': float(overlap_class_acc)
                 }
+                for class_id, class_acc in per_class_acc.items():
+                    metric_values[name+'_accC'+str(class_id)] = class_acc
+
                 results.update(metric_values)
 
                 # log metrics
