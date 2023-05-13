@@ -125,7 +125,8 @@ def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparam
                             train_args['steps'] = steps
                         if hparams is not None:
                             train_args['hparams'] = hparams
-                        train_args["overlap"] = overlap
+                        assert str(overlap) in datasets.OVERLAP_TYPES
+                        train_args["overlap"] = str(overlap)
                         args_list.append(train_args)
     return args_list
 
@@ -155,7 +156,8 @@ if __name__ == "__main__":
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--single_test_envs', action='store_true')
     parser.add_argument('--skip_confirmation', action='store_true')
-    parser.add_argument('--overlap', type=str, choices=datasets.OVERLAP_TYPES)
+    parser.add_argument('--overlap', type=int)
+    # parser.add_argument('--overlap', type=str, choices=datasets.OVERLAP_TYPES)
     args = parser.parse_args()
 
     args_list = make_args_list(
