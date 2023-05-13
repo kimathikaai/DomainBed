@@ -60,6 +60,7 @@ class SelectionMethod:
                 _hparams_accs[0][1][0]['args']['test_envs'],
                 _hparams_accs[0][1][0]['args']['hparams_seed'],
                 _hparams_accs[0][1][0]['args']['output_dir'],
+                _hparams_accs[0][1][0]['args'],
                 _hparams_accs[0][0]
                   )
             return _hparams_accs[0][0]['test_acc']
