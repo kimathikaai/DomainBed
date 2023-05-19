@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,6 +14,8 @@ from tqdm import tqdm
 plt.rcParams["font.family"] = "Times New Roman"
 
 def get_pickle_files(folders):
+    if not isinstance(folders, list):
+        folders = [folders]
     files = []
     for folder in tqdm(folders):
         path = f'/Users/kimathikaai/scratch/saved/domainbed_results/tsne/{folder}/*.pickle'
@@ -63,8 +66,8 @@ def camera_plot_embeddings(data, ax, point_type, colors, alpha=1, s=1.5, edgecol
             edgecolor=edgecolor
             )
     #ax.axis('off')
-    ax.axes.get_xaxis().set_ticklabels([])
-    ax.axes.get_yaxis().set_ticklabels([])
+    # ax.axes.get_xaxis().set_ticklabels([])
+    # ax.axes.get_yaxis().set_ticklabels([])
     
     return ax
 
@@ -90,7 +93,7 @@ def plot_embeddings(df_list):
         test_env = test_env[0]
 
         # GET FIGURE AND AXES
-        fig, ax = plt.subplots(ncols=3, nrows=1, figsize=(12,4), sharey=True)
+        fig, ax = plt.subplots(ncols=3, nrows=1, figsize=(14,3), sharey=True)
         # fig.suptitle(f"Test Domain: {test_env}\nPath: {file}", fontsize=15)
         fig.tight_layout()
         
@@ -98,20 +101,22 @@ def plot_embeddings(df_list):
         point_type = 'class'
         data = df.loc[(df['is_test']==0)].sort_values(by=point_type)
         camera_plot_embeddings(data=data, ax=ax[0], point_type=point_type, colors=class_colors)
-        ax[0].set_title("Source: Class Embeddings", fontsize=20)
+        # ax[0].set_title("Source: Class Embeddings", fontsize=20)
 
         # SOURCE DOMAINS
         point_type = 'domain'
         data = df.loc[(df['is_test']==0)].sort_values(by=point_type)
         camera_plot_embeddings(data=data, ax=ax[1], point_type=point_type, colors=domain_colors)
-        ax[1].set_title("Source: Domain Embeddings", fontsize=20)
+        # ax[1].set_title("Source: Domain Embeddings", fontsize=20)
         # ax_legend = ax[1].get_legend_handles_labels()
 
         # TARGET DOMAIN CLASSES
         point_type = 'class'
         data = df.loc[(df['is_test']==1)].sort_values(by=point_type)
         camera_plot_embeddings(data=data, ax=ax[2], point_type=point_type, colors=class_colors)    
-        ax[2].set_title("Target: Class Embeddings", fontsize=20)
+        # ax[2].set_title("Target: Class Embeddings", fontsize=20)
+
+        return fig, ax
         # ax[2].legend(
         #     title="Classes", 
         #     markerscale=2, 
