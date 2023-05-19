@@ -142,7 +142,7 @@ def print_results_tables(records, selection_method, latex):
         latex=latex)
 
 if __name__ == "__main__":
-    VIABLE_METRICS = ["acc", "nacc", "oacc", "f1", "macc", "vacc"]
+    VIABLE_METRICS = ["acc", "nacc", "oacc", "f1", "macc", "vacc"] + ["accC"+str(i) for i in range(65)]
     np.set_printoptions(suppress=True)
 
     parser = argparse.ArgumentParser(
