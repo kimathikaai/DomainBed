@@ -13,12 +13,13 @@ from sklearn.decomposition import PCA
 from tqdm import tqdm
 plt.rcParams["font.family"] = "Times New Roman"
 
-def get_pickle_files(folders):
+def get_pickle_files(folders, base_path):
     if not isinstance(folders, list):
         folders = [folders]
     files = []
     for folder in tqdm(folders):
-        path = f'/Users/kimathikaai/scratch/saved/domainbed_results/tsne/{folder}/*.pickle'
+        path = os.path.join(base_path, f"{folder}/*.pickle")
+        # path = f'/Users/kimathikaai/scratch/saved/domainbed_results/tsne/{folder}/*.pickle'
         path = sorted(glob(path, recursive=True))[0]
         assert os.path.exists(path), path
         files.append(path)
@@ -40,8 +41,8 @@ def get_tsne_df(path, pca_components=48):
     pca = PCA(n_components=pca_components)
     zs = np.array(list(df['latent_vector']))
     pca.fit(zs)
-    print('Cumulative explained variation for {} principal components: {}'.format(
-        pca_components, np.sum(pca.explained_variance_ratio_)))
+    # print('Cumulative explained variation for {} principal components: {}'.format(
+    #     pca_components, np.sum(pca.explained_variance_ratio_)))
 
     # use tsne
     zs = pca.transform(zs)
@@ -94,7 +95,7 @@ def plot_embeddings(df_list):
 
         # GET FIGURE AND AXES
         fig, ax = plt.subplots(ncols=3, nrows=1, figsize=(14,3), sharey=True)
-        # fig.suptitle(f"Test Domain: {test_env}\nPath: {file}", fontsize=15)
+        fig.suptitle(f"Test Domain: {test_env}\nPath: {file}", fontsize=15)
         fig.tight_layout()
         
         # SOURCE DOMAIN CLASSES
@@ -116,7 +117,7 @@ def plot_embeddings(df_list):
         camera_plot_embeddings(data=data, ax=ax[2], point_type=point_type, colors=class_colors)    
         # ax[2].set_title("Target: Class Embeddings", fontsize=20)
 
-        return fig, ax
+        # return fig, ax
         # ax[2].legend(
         #     title="Classes", 
         #     markerscale=2, 
