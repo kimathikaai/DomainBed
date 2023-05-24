@@ -72,7 +72,7 @@ def camera_plot_embeddings(data, ax, point_type, colors, alpha=1, s=1.5, edgecol
     
     return ax
 
-def plot_embeddings(df_list):
+def plot_embeddings(df_list, single_plot=False):
     """Plot source class, source domains, target class"""
     if not isinstance(df_list, list):
         df_list = [df_list]
@@ -95,7 +95,6 @@ def plot_embeddings(df_list):
 
         # GET FIGURE AND AXES
         fig, ax = plt.subplots(ncols=3, nrows=1, figsize=(14,3), sharey=True)
-        fig.suptitle(f"Test Domain: {test_env}\nPath: {file}", fontsize=15)
         fig.tight_layout()
         
         # SOURCE DOMAIN CLASSES
@@ -116,6 +115,11 @@ def plot_embeddings(df_list):
         data = df.loc[(df['is_test']==1)].sort_values(by=point_type)
         camera_plot_embeddings(data=data, ax=ax[2], point_type=point_type, colors=class_colors)    
         # ax[2].set_title("Target: Class Embeddings", fontsize=20)
+
+        if single_plot:
+            return fig, ax
+        
+        fig.suptitle(f"Test Domain: {test_env}\nPath: {file}", fontsize=15)
 
         # return fig, ax
         # ax[2].legend(
