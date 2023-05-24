@@ -1,6 +1,6 @@
 # Domain Generalization for Domain-Linked Classes
 Code release for "Domain Generalization for Domain-Linked Classes" NeurIPS 2023 submission.
-This repostitory is a modification of "DomainBed". DomainBed is a PyTorch suite containing benchmark datasets and algorithms for domain generalization, as introduced in [In Search of Lost Domain Generalization](https://arxiv.org/abs/2007.01434).
+This repostitory is a modification of "DomainBed". DomainBed is a PyTorch suite containing benchmark datasets and algorithms for domain generalization, as introduced in ["In Search of Lost Domain Generalization"](https://arxiv.org/abs/2007.01434).
 
 ## Evaluation Datasets
 Here are the evaluation datasets and their [interfaces](domainbed/datasets.py):
@@ -13,7 +13,7 @@ Here are the evaluation datasets and their [interfaces](domainbed/datasets.py):
 Refer to [chai_requirements.txt](chai_requirements.txt) and [chai_conda.txt](chai_conda.txt)
 
 ## Algorithms
-Refer to the algorithm implementations [here](domainbed/algorithms.py):
+Refer to the algorithm implementations in [algorithms.py](domainbed/algorithms.py):
 #### Baselines
 * Empirical Risk Minimization (ERM, [Vapnik, 1998](https://www.wiley.com/en-fr/Statistical+Learning+Theory-p-9780471030034))
 * Deep CORAL (CORAL, [Sun and Saenko, 2016](https://arxiv.org/abs/1607.01719))
@@ -29,7 +29,7 @@ Refer to the algorithm implementations [here](domainbed/algorithms.py):
 * FOND_FBA
 
 ## Hyper-Parameter Search
-Refer to hyper-parameter random search [implementations for each algorithm](domainbed/hparams_registry.py)
+Refer to [hparams_registry.py](domainbed/hparams_registry.py) for hyper-parameter search spaces for each algorithm
 
 ## Quick Start
 Download the datasets:
@@ -76,5 +76,4 @@ python3 -m domainbed.scripts.collect_results\
         --selec_metric=nacc\
         --overlap=high\
         --latex
-
 ```
