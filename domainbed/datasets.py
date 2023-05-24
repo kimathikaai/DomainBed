@@ -35,8 +35,9 @@ DATASETS = [
     "WILDSFMoW"
 ]
 
-OVERLAP_TYPES = ["none", "low", "mid", "high", "full", "0", "33", "66", "100"]
-SPECIAL_OVERLAP_TYPES = ["0", "33", "66", "100"]
+# OVERLAP_TYPES = ["none", "low", "mid", "high", "full", "0", "33", "66", "100"]
+SPECIAL_OVERLAP_TYPES = ["low", "high"]
+OVERLAP_TYPES = ["low", "high"]
 
 def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
     N_noc = N_c - N_oc
@@ -405,8 +406,8 @@ class VLCS(MultipleEnvironmentImageFolder):
 
         special_class_overlap = {
             "0": [[0, 1], [2, 3], [4]],
-            "33": [[0, 1, 2], [2, 3], [3, 4]],
-            "66": [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
+            "low": [[0, 1, 2], [2, 3], [3, 4]],
+            "high": [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
             "100": [list(range(5)), list(range(5)), list(range(5))],
         }
 
@@ -453,8 +454,8 @@ class PACS(MultipleEnvironmentImageFolder):
 
         special_class_overlap = {
             "0": [[0, 1], [2, 3], [4, 5, 6]],
-            "33": [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
-            "66": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
+            "low": [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
+            "high": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
             "100": [list(range(7)), list(range(7)), list(range(7))],
         }
 
@@ -504,8 +505,8 @@ class OfficeHome(MultipleEnvironmentImageFolder):
 
         special_class_overlap = {
             "0": [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
-            "33": [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
-            "66": [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
+            "low": [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
+            "high": [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
             "100": [list(range(65)), list(range(65)), list(range(65))],
         }
 
