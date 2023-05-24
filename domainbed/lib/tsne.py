@@ -20,7 +20,7 @@ def get_pickle_files(folders, base_path):
     for folder in tqdm(folders):
         path = os.path.join(base_path, f"{folder}/*.pickle")
         # print(path)
-        # path = f'/Users/kimathikaai/scratch/saved/domainbed_results/tsne/{folder}/*.pickle'
+        # path = f'/Users/noname/scratch/saved/domainbed_results/tsne/{folder}/*.pickle'
         path = sorted(glob(path, recursive=True))[0]
         assert os.path.exists(path), path
         files.append(path)

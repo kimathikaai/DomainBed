@@ -2,7 +2,7 @@
 
 dataset='All'
 
-input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/tsne'
+input_dir='/Users/noname/scratch/saved/domainbed_results/tsne'
 
 for selec_metric in macc vacc acc nacc oacc f1
 do

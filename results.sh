@@ -5,7 +5,7 @@ dataset='Track'
 # # for overlap in mid high low 33 66
 # for overlap in 33 66
 # do
-#     input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/rerun/'${overlap}'_pacs'
+#     input_dir='/Users/noname/scratch/saved/domainbed_results/rerun/'${overlap}'_pacs'
 #
 #     for selec_metric in nacc
 #     do
@@ -34,7 +34,7 @@ dataset='Track'
 #
 # for overlap in 33 66
 # do
-#     input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/rerun/'${overlap}'_vlcs'
+#     input_dir='/Users/noname/scratch/saved/domainbed_results/rerun/'${overlap}'_vlcs'
 #
 #     for selec_metric in nacc
 #     do
@@ -63,7 +63,7 @@ dataset='Track'
 
 for overlap in 33
 do
-    input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/rerun/'${overlap}'_officehome'
+    input_dir='/Users/noname/scratch/saved/domainbed_results/rerun/'${overlap}'_officehome'
 
     for selec_metric in nacc
     do
