@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--input_dir", type=str, required=True)
     parser.add_argument("--selec_metric", type=str, required=True, choices=VIABLE_METRICS)
     parser.add_argument("--eval_metric", type=str, required=True, choices=VIABLE_METRICS)
-    parser.add_argument("--dataset", type=str, required=True)
+    parser.add_argument("--dataset", type=str, default="All")
     parser.add_argument("--overlap", type=str, required=True)
     parser.add_argument("--latex", action="store_true")
     args = parser.parse_args()
