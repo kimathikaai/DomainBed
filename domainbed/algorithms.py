@@ -55,17 +55,17 @@ ALGORITHMS = [
     'CausIRL_MMD',
     'EQRM',
     'Intra',
-    'XDom',
+    'FOND_FB',
     'XDomError',
-    'XDomBeta',
-    'XDomBetaError',
+    'FOND_F',
+    'FOND',
     'XDomMLDG',
     'XDomBetaMLDG',
     'XDomBetaMLDGV2',
     'XDomBetaErrorMLDG',
     'XDomBetaErrorMLDGV2',
     'XDomBetaErrorMLDGV3',
-    'SupCon',
+    'FOND_FBA',
     'Intra_XDom',
     'XMLDG'
 ]
@@ -1698,7 +1698,7 @@ class AbstractCAD(Algorithm):
 
     def bn_loss(self, z, y, dom_labels):
         """Contrastive based domain bottleneck loss
-         The implementation is based on the supervised contrastive loss (SupCon) introduced by
+         The implementation is based on the supervised contrastive loss (FOND_FBA) introduced by
          P. Khosla, et al., in “Supervised Contrastive Learning“.
         Modified from  https://github.com/HobbitLong/SupContrast/blob/8d0963a7dbb1cd28accb067f5144d61f18a77588/losses.py#L11
         """
@@ -2135,7 +2135,7 @@ class AbstractXDom(ERM):
         epsilon: float = 1e-6,
     ):
         """
-        Regular SupCon Loss with custom masks for positive and A(i) "negative" samples
+        Regular FOND_FBA Loss with custom masks for positive and A(i) "negative" samples
         """
 
         mean_positives_per_sample = (
@@ -2338,17 +2338,17 @@ class XDomBase(AbstractXDom):
         }
 
 
-class XDomBetaError(XDomBase):
+class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(XDomBetaError, self).__init__(
+        super(FOND, self).__init__(
             input_shape, num_classes, num_domains, hparams
         )
 
 
-class XDomBeta(XDomBase):
+class FOND_F(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["error_lmbd"] = 0
-        super(XDomBeta, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(FOND_F, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
 class XDomError(XDomBase):
@@ -2357,19 +2357,19 @@ class XDomError(XDomBase):
         super(XDomError, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
-class XDom(XDomBase):
+class FOND_FB(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["error_lmbd"] = 0
         hparams["xda_beta"] = 1
-        super(XDom, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(FOND_FB, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
-class SupCon(XDomBase):
+class FOND_FBA(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["xda_alpha"] = 1
         hparams["xda_beta"] = 1
         hparams["error_lmbd"] = 0
-        super(SupCon, self).__init__(input_shape, num_classes, num_domains, hparams)
+        super(FOND_FBA, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
 class Intra_XDom(AbstractXDom):
@@ -2757,7 +2757,7 @@ class XDomBetaErrorMLDG(AbstractXDom):
             + masks["same_domain_diff_class_mask"] * self.mtr_xda_beta
         )
 
-        # META-TRAIN: Get meta-train xdom loss
+        # META-TRAIN: Get meta-train FOND_FB loss
         mtr_xdom, mtr_positive, mtr_zeros = self.supcon_loss(
             projections=F.normalize(
                 inner_net["projector"](inner_net["featurizer"](mtr_x))
@@ -2813,7 +2813,7 @@ class XDomBetaErrorMLDG(AbstractXDom):
             + masks["same_domain_diff_class_mask"] * self.mt_xda_beta
         )
 
-        # META-TEST: Get meta-train xdom loss
+        # META-TEST: Get meta-train FOND_FB loss
         mt_xdom, mt_positive, mt_zeros = self.supcon_loss(
             projections=F.normalize(
                 inner_net["projector"](inner_net["featurizer"](mt_x))
