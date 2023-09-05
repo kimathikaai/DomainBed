@@ -17,6 +17,7 @@ import torch
 import torchvision
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
+import pytorch_lightning as pl
 
 from domainbed import datasets
 from domainbed import hparams_registry
@@ -100,9 +101,7 @@ if __name__ == "__main__":
     for k, v in sorted(hparams.items()):
         print('\t{}: {}'.format(k, v))
 
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+    pl.seed_everything(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
