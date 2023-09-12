@@ -67,7 +67,8 @@ ALGORITHMS = [
     'XDomBetaErrorMLDGV3',
     'FOND_FBA',
     'Intra_XDom',
-    'XMLDG'
+    'XMLDG',
+    'PGrad'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2340,9 +2341,7 @@ class XDomBase(AbstractXDom):
 
 class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(FOND, self).__init__(
-            input_shape, num_classes, num_domains, hparams
-        )
+        super(FOND, self).__init__(input_shape, num_classes, num_domains, hparams)
 
 
 class FOND_F(XDomBase):
@@ -2884,6 +2883,7 @@ class XDomBetaErrorMLDGV2(XDomBetaErrorMLDG):
         # Only assert error loss for meta-test
         self.mtr_error_lmbd = 0
 
+
 class XDomBetaErrorMLDGV3(XDomBetaErrorMLDG):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(XDomBetaErrorMLDGV3, self).__init__(
@@ -2895,12 +2895,14 @@ class XDomBetaErrorMLDGV3(XDomBetaErrorMLDG):
         # Only apply intra-domain negative weight to meta-train
         self.mt_xda_beta = 1
 
+
 class XDomBetaMLDG(XDomBetaErrorMLDG):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         hparams["error_lmbd"] = 0
         super(XDomBetaMLDG, self).__init__(
             input_shape, num_classes, num_domains, hparams
         )
+
 
 class XDomBetaMLDGV2(XDomBetaErrorMLDG):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2916,3 +2918,148 @@ class XDomMLDG(XDomBetaErrorMLDG):
         hparams["xda_beta"] = 1
         hparams["error_lmbd"] = 0
         super(XDomMLDG, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+
+class PGrad(Fish):
+    "Learning Principal Gradients for Domain Generalization"
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(PGrad, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.input_shape = input_shape
+        self.num_classes = num_classes
+        self.num_domains = num_domains
+        self.network = networks.WholeFish(
+            self.input_shape, self.num_classes, self.hparams
+        )
+        self.optimizer = torch.optim.SGD(
+            self.network.parameters(), lr=0.1, weight_decay=self.hparams["weight_decay"]
+        )
+        self.optimizer_inner_state = None
+        self.split_num = 3
+        self.global_update = 0
+
+    def create_clone(self, device):
+        self.network_inner = networks.WholeFish(
+            self.input_shape,
+            self.num_classes,
+            self.hparams,
+            weights=self.network.state_dict(),
+        ).to(device)
+        self.optimizer_inner = torch.optim.Adam(
+            self.network_inner.parameters(), lr=self.hparams["lr"]
+        )
+        if self.optimizer_inner_state is not None:
+            self.optimizer_inner.load_state_dict(self.optimizer_inner_state)
+
+    def transpose_pca(self, stack_classifier, comb=True):
+        stack_classifier = torch.cat(stack_classifier)
+        mean_classifier = stack_classifier.mean(dim=0)
+        centerized_classifier = stack_classifier - mean_classifier
+        cov_classifier = (
+            centerized_classifier
+            @ centerized_classifier.T
+            / (stack_classifier.size(1) - 1)
+        )
+        pr_direction, pr_value, _ = torch.svd(cov_classifier)
+        pr_direction = centerized_classifier.T @ pr_direction
+        pr_direction = pr_direction / pr_direction.norm(dim=0)
+        return pr_direction, pr_value
+
+    def stack_and_pca(self, envs_weights):
+        new_stack = [[] for _ in range(self.split_num * self.num_domains + 1)]
+        for i in range(self.split_num * self.num_domains + 1):
+            new_stack[i] = [
+                envs_weights[ele]["value"][i].view(1, -1) for ele in envs_weights.keys()
+            ]
+            new_stack[i] = torch.cat(new_stack[i], dim=1)
+        pr_direction, pr_value = self.transpose_pca(new_stack)
+        return pr_direction, pr_value
+
+    def principal_grad(self, meta_weights, inner_weights, params_stack):
+        if True:
+            meta_weights = ParamDict(meta_weights)
+            inner_weights = ParamDict(inner_weights)
+            diff_weights = meta_weights - inner_weights
+            norm_diff = sum([ele.pow(2).sum() for ele in diff_weights.values()])
+            norm_diff = norm_diff.sqrt()
+            principle_dir, pr_value = self.stack_and_pca(params_stack)
+            principle_dir *= norm_diff  # length calibration
+            grad_mask = torch.zeros_like(pr_value)
+            start_index = 0
+            for name, value in self.network.named_parameters():
+                param_size = value.numel()
+                end_index = start_index + param_size
+                pra_grad = principle_dir[start_index:end_index, :]
+                cali_direction = diff_weights[name]
+                cali_mask = (cali_direction.flatten().unsqueeze(1) * pra_grad).sum(0)
+                grad_mask += cali_mask
+                start_index = end_index
+
+            cali_mask = 2 * (grad_mask > 0).float() - 1
+            pra_grad = cali_mask * principle_dir  # direction calibration
+            comb_num = 4
+            comb_coef = pr_value[:comb_num] / pr_value[:comb_num].norm()
+            pra_grad = (comb_coef * pra_grad[:, :comb_num]).sum(1)  # direction ensemble
+            start_index = 0
+            # Learning PGrad for model update
+            for name, value in self.network.named_parameters():
+                param_size = value.numel()
+                end_index = start_index + param_size
+                value_grad = pra_grad[start_index:end_index].view(value.size())
+                start_index = end_index
+                value.grad = value_grad.clone()
+
+    def update(self, minibatches, unlabeled=None):
+        self.create_clone(minibatches[0][0].device)
+        params_stack = {
+            key: {"value": []} for key, _ in self.network.named_parameters()
+        }
+        range_list = list(range(0, len(minibatches)))
+        random.shuffle(range_list)
+        for i in range(self.split_num):
+            "Trajectory Sampling"
+            for num, index in enumerate(range_list):
+                x, y = minibatches[index]
+                x = x[
+                    (i * x.size(0) // self.split_num) : (
+                        (i + 1) * x.size(0) // self.split_num
+                    )
+                ]
+                y = y[
+                    i
+                    * y.size(0)
+                    // self.split_num : (i + 1)
+                    * y.size(0)
+                    // self.split_num
+                ]
+                loss = F.cross_entropy(self.network_inner(x), y)
+                self.optimizer_inner.zero_grad()
+                loss.backward()
+                for (key, _), env_value in zip(
+                    params_stack.items(), self.network_inner.parameters()
+                ):
+                    params_stack[key]["value"].append(
+                        copy.deepcopy(env_value).unsqueeze(dim=0)
+                    )
+                self.optimizer_inner.step()
+            random.shuffle(range_list)
+        for (key, _), env_value in zip(
+            params_stack.items(), self.network_inner.parameters()
+        ):
+            params_stack[key]["value"].append(copy.deepcopy(env_value).unsqueeze(0))
+
+        self.optimizer_inner_state = self.optimizer_inner.state_dict()
+        self.optimizer.zero_grad()
+
+        "PGrad Learning"
+        self.principal_grad(
+            self.network.named_parameters(),
+            self.network_inner.named_parameters(),
+            params_stack,
+        )
+        self.optimizer.step()
+        self.global_update += 1
+        return {"loss": loss.item()}
+
+    def predict(self, x):
+        return self.network(x)
