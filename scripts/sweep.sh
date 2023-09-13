@@ -6,8 +6,8 @@ outputdir=/pub2/podg
 n_hparams=5
 steps=5001
 trial=3
-gpu=2
-algorithm=CausIRL_MMD
+gpu=1
+algorithm=PGrad
 jobid=iclr2024
 
 for dataset in OfficeHome VLCS PACS
