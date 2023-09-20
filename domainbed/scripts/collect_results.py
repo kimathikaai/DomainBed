@@ -154,6 +154,7 @@ if __name__ == "__main__":
     parser.add_argument("--overlap", type=str, required=True)
     parser.add_argument("--latex", action="store_true")
     args = parser.parse_args()
+    print("% Arguments: {}".format(vars(args)))
 
     results_file_name = f"domainbed_results_{args.dataset}_{args.overlap}_{args.selec_metric}_{args.eval_metric}"
     results_file = f"{results_file_name}.tex" if args.latex else f"{results_file_name}.txt"
