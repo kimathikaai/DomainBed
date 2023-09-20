@@ -10,7 +10,7 @@ gpu=1
 algorithm=PGrad
 jobid=iclr2024
 
-for dataset in OfficeHome VLCS PACS
+for dataset in PACS VLCS OfficeHome
 do
     for overlap in low high
     do
