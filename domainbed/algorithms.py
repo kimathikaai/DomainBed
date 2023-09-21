@@ -2931,6 +2931,7 @@ class PGrad(Fish):
         self.network = networks.WholeFish(
             self.input_shape, self.num_classes, self.hparams
         )
+        self.featurizer = self.network.featurizer
         self.optimizer = torch.optim.SGD(
             self.network.parameters(), lr=0.1, weight_decay=self.hparams["weight_decay"]
         )
