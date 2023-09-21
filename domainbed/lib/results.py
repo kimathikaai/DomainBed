@@ -15,7 +15,7 @@ METHOD_NAME = "FOND"
 VIABLE_SELECTION_METRICS = ["acc", "f1", "oacc", "nacc", "macc", "vacc"] + ["accC"+str(i) for i in range(65)]
 VIABLE_EVALUATION_METRICS = VIABLE_SELECTION_METRICS
 
-BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL"]
+BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL", "CausIRL_MMD"]
 METHODS = [METHOD_NAME]
 
 RENAMES = {
@@ -51,12 +51,14 @@ BASELINE_MARKERS = [
     "d",
     "<",
     "h", 
+    '8',
+    '^'
 ]
 
 # base_colors = cm.Set3(np.linspace(0, 1, len(BASELINES)))
 # base_colors = cm.YlOrRd(np.linspace(0, 1, len(BASELINES)))
 # base_colors = list(mcolors.TABLEAU_COLORS.keys())
-BASE_COLORS = ["red", "darkviolet", "orange", "cornflowerblue", "limegreen", "yellow", "darkgrey"]
+BASE_COLORS = ["red", "darkviolet", "orange", "cornflowerblue", "limegreen", "yellow", "darkgrey", "pink"]
 
 
 MARKERS = BASELINE_MARKERS + ABLATION_MARKERS
