@@ -12,10 +12,25 @@ import itertools
 
 METHOD_NAME = "FOND"
 
-VIABLE_SELECTION_METRICS = ["acc", "f1", "oacc", "nacc", "macc", "vacc"] + ["accC"+str(i) for i in range(65)]
+VIABLE_SELECTION_METRICS = ["acc", "f1", "oacc", "nacc", "macc", "vacc"] + [
+    "accC" + str(i) for i in range(65)
+]
 VIABLE_EVALUATION_METRICS = VIABLE_SELECTION_METRICS
 
-BASELINES = ["SelfReg", "MLDG", "Transfer", "ERM", "CAD", "ARM", "CORAL", "CausIRL_MMD"]
+BASELINES = [
+    "SelfReg",
+    "MLDG",
+    "Transfer",
+    "ERM",
+    "CAD",
+    "ARM",
+    "CORAL",
+    # "CausIRL_MMD",
+    # "CausIRL_CORAL",
+    "CausIRL",
+    "PGrad",
+    "EQRM",
+]
 METHODS = [METHOD_NAME]
 
 RENAMES = {
@@ -24,9 +39,17 @@ RENAMES = {
     "XDomBeta": METHOD_NAME + r"\F",
     "XDomBetaError": METHOD_NAME,
     "SupCon": METHOD_NAME + r"\FBA",
+    "CausIRL_CORAL": "CausIRL"
 }
 
-ABLATIONS = list(RENAMES.values())
+ABLATIONS = [
+    METHOD_NAME + r"\FB",
+    METHOD_NAME + r"\F",
+    METHOD_NAME,
+    METHOD_NAME + r"\FBA",
+]
+
+# ABLATIONS = list(RENAMES.values()).remove('CausIRL')
 
 AXIS_LABELS = {
     "nacc": r"Domain-Linked ($\mathcal{Y}_{L}$) Accuracy",
@@ -50,15 +73,29 @@ BASELINE_MARKERS = [
     "H",
     "d",
     "<",
-    "h", 
-    '8',
-    '^'
+    "h",
+    "8",
+    "^",
+    # "4",
+    "$\\clubsuit$",
 ]
 
 # base_colors = cm.Set3(np.linspace(0, 1, len(BASELINES)))
 # base_colors = cm.YlOrRd(np.linspace(0, 1, len(BASELINES)))
 # base_colors = list(mcolors.TABLEAU_COLORS.keys())
-BASE_COLORS = ["red", "darkviolet", "orange", "cornflowerblue", "limegreen", "yellow", "darkgrey", "pink"]
+BASE_COLORS = [
+    "red",
+    "darkviolet",
+    "orange",
+    "cornflowerblue",
+    "limegreen",
+    "yellow",
+    "darkgrey",
+    "pink",
+    'blue',
+    'limegreen',
+    'magenta'
+]
 
 
 MARKERS = BASELINE_MARKERS + ABLATION_MARKERS
@@ -283,7 +320,6 @@ def plot_overlap_dataset(
     def rescale(row, rows):
         return (row - np.min(rows)) / (np.max(rows) - np.min(rows))
 
-
     i_p = 0
     i_b = 0
     # populate scatter plot
@@ -325,8 +361,8 @@ def plot_overlap_dataset(
                 x=row[x],
                 y=row[y],
                 color="black",
-                label='_nolegend_',
-                marker='.',
+                label="_nolegend_",
+                marker=".",
                 s=mpl.rcParams["lines.markersize"] ** 1,
                 zorder=15,
             )
@@ -470,5 +506,3 @@ def plot_results(df, selec_metric, eval_metric, overlap_list, dataset_list):
     fig.suptitle(f"(s,e) = ({selec_metric},{eval_metric})")
     fig.tight_layout(pad=1.0, h_pad=2.0)
     return fig
-
-
