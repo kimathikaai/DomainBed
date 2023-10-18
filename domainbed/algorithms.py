@@ -2325,6 +2325,24 @@ class XDomBase(AbstractXDom):
             + self.error_lmbd * torch.abs(error_loss)
         )
 
+        # # Ex 1
+        # loss = (
+        #     class_loss
+        #     + self.xdom_lmbd * xdom_loss
+        #     + self.error_lmbd * noc_class_loss
+        # )
+        #
+        # # Ex 2
+        # loss = (
+        #     self.xdom_lmbd * xdom_loss
+        #     + noc_class_loss
+        # )
+        #
+        # # Ex 3
+        # loss = (
+        #     noc_class_loss
+        # )
+
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
