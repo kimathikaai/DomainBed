@@ -68,7 +68,10 @@ ALGORITHMS = [
     'FOND_FBA',
     'Intra_XDom',
     'XMLDG',
-    'PGrad'
+    'PGrad',
+    'FOND_NC',
+    'FOND_N',
+    'NOC'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2325,24 +2328,6 @@ class XDomBase(AbstractXDom):
             + self.error_lmbd * torch.abs(error_loss)
         )
 
-        # # Ex 1
-        # loss = (
-        #     class_loss
-        #     + self.xdom_lmbd * xdom_loss
-        #     + self.error_lmbd * noc_class_loss
-        # )
-        #
-        # # Ex 2
-        # loss = (
-        #     self.xdom_lmbd * xdom_loss
-        #     + noc_class_loss
-        # )
-        #
-        # # Ex 3
-        # loss = (
-        #     noc_class_loss
-        # )
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -2361,6 +2346,194 @@ class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(FOND, self).__init__(input_shape, num_classes, num_domains, hparams)
 
+# FOND with a non overlapping class loss and overall class loss
+class FOND_NC(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(FOND_NC, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+    def update(self, minibatches, unlabeled=None):
+        values = self.preprocess(minibatches)
+
+        domains = torch.cat(values["domains"])
+        targets = torch.cat(values["targets"])
+        classifs = torch.cat(values["classifs"])
+        projections = torch.cat(values["projections"])
+
+        masks = self.get_masks(Y=targets, D=domains)
+
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
+            projections=projections,
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
+
+        oc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.oc_weight.to(targets.device)
+        )
+        noc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.noc_weight.to(targets.device)
+        )
+        error_loss = oc_class_loss - noc_class_loss
+        if torch.isnan(error_loss):
+            error_loss = torch.tensor(0).to(targets.device)
+
+        class_loss = F.cross_entropy(classifs, targets)
+
+        loss = (
+            class_loss
+            + self.xdom_lmbd * xdom_loss
+            + self.error_lmbd * noc_class_loss
+        )
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "xdom_loss": xdom_loss.item(),
+            "error_loss": error_loss.item(),
+            "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item(),
+        }
+
+# FOND with a non overlapping class loss, but no overall class loss
+class FOND_N(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(FOND_N, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+    def update(self, minibatches, unlabeled=None):
+        values = self.preprocess(minibatches)
+
+        domains = torch.cat(values["domains"])
+        targets = torch.cat(values["targets"])
+        classifs = torch.cat(values["classifs"])
+        projections = torch.cat(values["projections"])
+
+        masks = self.get_masks(Y=targets, D=domains)
+
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
+            projections=projections,
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
+
+        oc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.oc_weight.to(targets.device)
+        )
+        noc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.noc_weight.to(targets.device)
+        )
+        error_loss = oc_class_loss - noc_class_loss
+        if torch.isnan(error_loss):
+            error_loss = torch.tensor(0).to(targets.device)
+
+        class_loss = F.cross_entropy(classifs, targets)
+
+        loss = (
+            self.xdom_lmbd * xdom_loss
+            + noc_class_loss
+        )
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "xdom_loss": xdom_loss.item(),
+            "error_loss": error_loss.item(),
+            "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item(),
+        }
+
+# Just NOC loss
+class NOC(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(NOC, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+    def update(self, minibatches, unlabeled=None):
+        values = self.preprocess(minibatches)
+
+        domains = torch.cat(values["domains"])
+        targets = torch.cat(values["targets"])
+        classifs = torch.cat(values["classifs"])
+        projections = torch.cat(values["projections"])
+
+        masks = self.get_masks(Y=targets, D=domains)
+
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
+        )
+
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
+            projections=projections,
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
+
+        oc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.oc_weight.to(targets.device)
+        )
+        noc_class_loss = F.cross_entropy(
+            classifs, targets, weight=self.noc_weight.to(targets.device)
+        )
+        error_loss = oc_class_loss - noc_class_loss
+        if torch.isnan(error_loss):
+            error_loss = torch.tensor(0).to(targets.device)
+
+        class_loss = F.cross_entropy(classifs, targets)
+
+        loss = (
+            noc_class_loss
+        )
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "xdom_loss": xdom_loss.item(),
+            "error_loss": error_loss.item(),
+            "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item(),
+        }        
 
 class FOND_F(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
