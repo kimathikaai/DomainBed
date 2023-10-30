@@ -80,3 +80,101 @@ python3 -m domainbed.scripts.collect_results\
         --overlap=high\
         --latex
 ```
+
+## Compute Canada
+Setup a python virtual environment:
+
+``` bash
+cd ~/
+mkdir envs/
+cd envs/
+# create a virtual environment
+module load python/3.8
+virtualenv --no-download domainbed
+```
+Install dependencies:
+```bash
+# activate the environment
+source ~/envs/domainbed/bin/activate
+# upgrade pip
+pip install --no-index --upgrade pip
+# clone the repository
+cd <your_workspace>
+git clone <repository_url>
+# install dependencies from a requirements file
+pip install --no-index -r cc_requirements.txt
+# deactivate environment
+deactivate
+```
+Download datasets:
+```bash
+source ~/envs/domainbed/bin/activate
+cd ~/<repository>
+# run download script
+python3 -m domainbed.scripts.download --data_dir=./domainbed/data
+```
+Creating a train sweep bash script:
+```bash
+#!/bin/bash
+#SBATCH --gres=gpu:1
+#SBATCH --nodes 1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=24
+#SBATCH --mem=32000M
+#SBATCH --time=1-00:00:00
+#SBATCH --account=def-sirisha
+
+module load python/3.8 cuda cudnn
+
+# Prepare virtualenv
+source ~/envs/domainbed/bin/activate
+
+# local variables
+datadir=~/scratch/data
+outputdir=~/scratch/saved
+n_hparams=5
+steps=5001
+trial=3
+jobid=iclr2024
+
+algorithm=FOND
+
+for dataset in VLCS PACS OfficeHome
+do
+    for overlap in low high
+    do
+        curr_outdir=${outputdir}/${jobid}_${algorithm}_${dataset}_${overlap}
+        echo starting ${curr_outdir}
+        mkdir -p ${curr_outdir}
+
+        # Remove incomplete runs
+        python -m domainbed.scripts.sweep delete_incomplete\
+           --data_dir=${datadir} \
+           --algorithms $algorithm \
+           --output_dir $curr_outdir\
+           --command_launcher local \
+           --overlap $overlap \
+           --steps ${steps} \
+           --single_test_envs \
+           --datasets=${dataset} \
+           --n_hparams ${n_hparams} \
+           --n_trials ${trial} \
+           --skip_confirmation
+
+        # Run 
+        python -m domainbed.scripts.sweep launch\
+           --data_dir=${datadir} \
+           --algorithms $algorithm \
+           --output_dir $curr_outdir\
+           --command_launcher local \
+           --overlap $overlap \
+           --steps ${steps} \
+           --single_test_envs \
+           --datasets=${dataset} \
+           --n_hparams ${n_hparams} \
+           --n_trials ${trial} \
+           --skip_confirmation
+    done
+done
+```
+
