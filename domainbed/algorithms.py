@@ -2388,8 +2388,9 @@ class FOND_NC(XDomBase):
         error_loss = oc_class_loss - noc_class_loss
         if torch.isnan(error_loss):
             error_loss = torch.tensor(0).to(targets.device)
-
         class_loss = F.cross_entropy(classifs, targets)
+        if torch.isnan(noc_class_loss):
+            noc_class_loss = torch.tensor(0).to(targets.device)
 
         loss = (
             class_loss
@@ -2406,6 +2407,7 @@ class FOND_NC(XDomBase):
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
             "error_loss": error_loss.item(),
+            "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
@@ -2452,8 +2454,9 @@ class FOND_N(XDomBase):
         error_loss = oc_class_loss - noc_class_loss
         if torch.isnan(error_loss):
             error_loss = torch.tensor(0).to(targets.device)
-
         class_loss = F.cross_entropy(classifs, targets)
+        if torch.isnan(noc_class_loss):
+            noc_class_loss = torch.tensor(0).to(targets.device)    
 
         loss = (
             self.xdom_lmbd * xdom_loss
@@ -2469,6 +2472,7 @@ class FOND_N(XDomBase):
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
             "error_loss": error_loss.item(),
+            "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
@@ -2515,9 +2519,10 @@ class NOC(XDomBase):
         error_loss = oc_class_loss - noc_class_loss
         if torch.isnan(error_loss):
             error_loss = torch.tensor(0).to(targets.device)
-
         class_loss = F.cross_entropy(classifs, targets)
-
+        if torch.isnan(noc_class_loss):
+            noc_class_loss = torch.tensor(0).to(targets.device)
+            
         loss = (
             noc_class_loss
         )
@@ -2531,6 +2536,7 @@ class NOC(XDomBase):
             "class_loss": class_loss.item(),
             "xdom_loss": xdom_loss.item(),
             "error_loss": error_loss.item(),
+            "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }        
