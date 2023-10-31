@@ -107,12 +107,23 @@ pip install --no-index -r cc_requirements.txt
 deactivate
 ```
 Download datasets:
+
+1. You will need to manualy move the PACS dataset zip file to your compute canada data directory (e.g. `~/scratch/data`) after downloading [PACS.zip](https://drive.google.com/uc?id=1JFr8f805nMUelQWWmfnJR3y4_SYoN5Pd) locally.
+2. Then in compute canada you can run the download script for all the datasets
 ```bash
 source ~/envs/domainbed/bin/activate
 cd ~/<repository>
 # run download script
-python3 -m domainbed.scripts.download --data_dir=./domainbed/data
+python3 -m domainbed.scripts.download --data_dir=~/scratch/data/
 ```
+Download the resnet18 and resnet50 pre-trained weights:
+```bash
+# ssh into compute canada
+ssh ...
+curl https://download.pytorch.org/models/resnet18-f37072fd.pth --output ~/scratch/saved/resnet18-f37072fd.pth
+curl https://download.pytorch.org/models/resnet50-11ad3fa6.pth --output ~/scratch/saved/resnet50-11ad3fa6.pth
+```
+
 Creating a train sweep bash script:
 ```bash
 #!/bin/bash
