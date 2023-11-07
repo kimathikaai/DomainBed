@@ -2521,7 +2521,7 @@ class NOC(XDomBase):
             error_loss = torch.tensor(0).to(targets.device)
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(noc_class_loss):
-            noc_class_loss = torch.tensor(0).to(targets.device)
+            noc_class_loss = torch.tensor(0, requires_grad=True, dtype=torch.float).to(targets.device)
             
         loss = (
             noc_class_loss
