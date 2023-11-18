@@ -43,8 +43,8 @@ DATASETS = [
 ]
 
 # OVERLAP_TYPES = ["none", "low", "mid", "high", "full", "0", "33", "66", "100"]
-SPECIAL_OVERLAP_TYPES = ["low", "high"]
-OVERLAP_TYPES = ["low", "high"]
+SPECIAL_OVERLAP_TYPES = ["low", "high", "low_linked_only", "high_linked_only"]
+OVERLAP_TYPES = ["low", "high", "low_linked_only", "high_linked_only"]
 
 def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
     N_noc = N_c - N_oc
@@ -338,6 +338,8 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
             # setup class filtering
             if i not in test_envs:
                 filter = domain_class_filter[shift_filter.pop()]
+                if filter == []:
+                    continue
                 all_classes = set(list(self.idx_to_class.keys())) 
                 remove_classes = list(all_classes - set(filter))
 
@@ -415,6 +417,8 @@ class VLCS(MultipleEnvironmentImageFolder):
             "0": [[0, 1], [2, 3], [4]],
             "low": [[0, 1, 2], [2, 3], [3, 4]],
             "high": [[0, 1, 2], [2, 3, 4], [3, 4, 0]],
+            "low_linked_only": [[0, 1], [], [4]],
+            "high_linked_only": [[1], [], []],
             "100": [list(range(5)), list(range(5)), list(range(5))],
         }
 
@@ -464,6 +468,8 @@ class PACS(MultipleEnvironmentImageFolder):
             "low": [[0, 1, 2], [2, 3, 4], [4, 5, 6]],
             "high": [[0, 1, 2, 3], [2, 3, 4, 5], [4, 5, 6, 0]],
             "100": [list(range(7)), list(range(7)), list(range(7))],
+            "low_linked_only": [[0, 1], [3], [5, 6]],
+            "high_linked_only": [[0, 1], [], [6]],
         }
 
         if overlap not in SPECIAL_OVERLAP_TYPES:
@@ -514,6 +520,8 @@ class OfficeHome(MultipleEnvironmentImageFolder):
             "0": [list(range(0,22)), list(range(22,44)), list(range(44, 65))],
             "low": [list(range(0,30)), list(range(14,44)), list(range(35, 65))], # 25/65
             "high": [list(range(0,38)), list(range(5,44)), list(range(27, 65))], # 50/65
+            "low_linked_only": [list(range(0,14)), list(range(30,35)), list(range(44, 65))],
+            "high_linked_only": [list(range(0,5)), [], list(range(44, 65))],
             "100": [list(range(65)), list(range(65)), list(range(65))],
         }
 
