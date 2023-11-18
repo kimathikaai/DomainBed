@@ -2069,6 +2069,7 @@ class EQRM(ERM):
 
         return {'loss': loss.item()}
 
+
 # fmt: on
 class AbstractXDom(ERM):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2342,9 +2343,104 @@ class XDomBase(AbstractXDom):
         }
 
 
+class FOND_Teacher(XDomBase):
+    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+        super(FOND_Teacher, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+        self.teacher = teacher
+
+        # Freeze the parameters of the teacher network
+        for param in self.teacher.classifier.parameters():
+            param.requires_grad = False
+        for param in self.teacher.featurizer.parameters():
+            param.requires_grad = False
+        for param in self.teacher.projector.parameters():
+            param.requires_grad = False
+
+    def preprocess(self, minibatches):
+        # NOTE: current implementations doesn't create duplicates
+        # check SelfReg
+
+        num_domains = len(minibatches)
+        features_student = [self.featurizer(xi) for xi, _ in minibatches]
+        features_teacher = [self.teacher.featurizer(xi) for xi, _ in minibatches]
+
+        projections_student = [F.normalize(self.projector(fi)) for fi in features]
+        projections_teacher = [F.normalize(self.projector(fi)) for fi in features]
+        classifs = [self.classifier(fi) for fi in features]
+        targets = [yi for _, yi in minibatches]
+
+        # create domain labels
+        domains = [
+            torch.zeros(len(x), dtype=torch.uint8).to(x.device) + i
+            for i, x in enumerate(targets)
+        ]
+
+        # match domains
+        if self.domain_relations is not None:
+            for old, new in self.domain_relations.items():
+                for d in domains:
+                    d[d == old] = new
+
+        return {
+            "features_student": features_student,
+            "features_teacher": features_teacher,
+            "projections_student": projections_student,
+            "projections_teacher": projections_teacher,
+            "classifs": classifs,
+            "targets": targets,
+            "domains": domains,
+            "num_domains": num_domains,
+        }
+
+    def update(self, minibatches, unlabeled=None):
+        values = self.preprocess(minibatches)
+
+        domains = torch.cat(values["domains"])
+        targets = torch.cat(values["targets"])
+        classifs = torch.cat(values["classifs"])
+
+        features_student = torch.cat(values["features_student"])
+        features_teacher = torch.cat(values["features_teacher"])
+        projections_student = torch.cat(values["projections_student"])
+        projections_teacher = torch.cat(values["projections_teacher"])
+
+        # if it is domain-linked
+        soft_projections_student = F.softmax(projections_students)
+        soft_projections_teacher = F.softmax(projections_teacher)
+        masked_projections_student = torch.masked_select(
+            soft_projections_student, self.noc_weight
+        )
+        masked_projections_teacher = torch.masked_select(
+            soft_projections_teacher, self.noc_weight
+        )
+
+        teacher_loss = F.kl_div(masked_projections_student, masked_projections_teacher)
+
+        class_loss = F.cross_entropy(classifs, targets)
+        if torch.isnan(class_loss):
+            class_loss = torch.tensor(0).to(targets.device)
+        if torch.isnan(teacher_loss):
+            teacher_loss = torch.tensor(0).to(targets.device)
+
+        loss = class_loss + teacher_loss
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "teacher_loss": teacher_loss.item(),
+        }
+
+
 class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(FOND, self).__init__(input_shape, num_classes, num_domains, hparams)
+
 
 # FOND with a non overlapping class loss and overall class loss
 class FOND_NC(XDomBase):
@@ -2393,9 +2489,7 @@ class FOND_NC(XDomBase):
             noc_class_loss = torch.tensor(0).to(targets.device)
 
         loss = (
-            class_loss
-            + self.xdom_lmbd * xdom_loss
-            + self.error_lmbd * noc_class_loss
+            class_loss + self.xdom_lmbd * xdom_loss + self.error_lmbd * noc_class_loss
         )
 
         self.optimizer.zero_grad()
@@ -2411,6 +2505,7 @@ class FOND_NC(XDomBase):
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
 
 # FOND with a non overlapping class loss, but no overall class loss
 class FOND_N(XDomBase):
@@ -2456,12 +2551,9 @@ class FOND_N(XDomBase):
             error_loss = torch.tensor(0).to(targets.device)
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(noc_class_loss):
-            noc_class_loss = torch.tensor(0).to(targets.device)    
+            noc_class_loss = torch.tensor(0).to(targets.device)
 
-        loss = (
-            self.xdom_lmbd * xdom_loss
-            + noc_class_loss
-        )
+        loss = self.xdom_lmbd * xdom_loss + noc_class_loss
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2476,6 +2568,7 @@ class FOND_N(XDomBase):
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
 
 # Just NOC loss
 class NOC(XDomBase):
@@ -2521,11 +2614,11 @@ class NOC(XDomBase):
             error_loss = torch.tensor(0).to(targets.device)
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(noc_class_loss):
-            noc_class_loss = torch.tensor(0, requires_grad=True, dtype=torch.float).to(targets.device)
-            
-        loss = (
-            noc_class_loss
-        )
+            noc_class_loss = torch.tensor(0, requires_grad=True, dtype=torch.float).to(
+                targets.device
+            )
+
+        loss = noc_class_loss
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2539,7 +2632,8 @@ class NOC(XDomBase):
             "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
-        }        
+        }
+
 
 class FOND_F(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
