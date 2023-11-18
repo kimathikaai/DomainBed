@@ -1,6 +1,7 @@
 __pycache__
 domainbed/facebook.py
 **/.ipynb_checkpoints/*
+venv/*
 
 domainbed/data/*
 train_output/*
