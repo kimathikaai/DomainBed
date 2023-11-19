@@ -24,7 +24,7 @@ algorithm=NOC
 
 for dataset in VLCS PACS OfficeHome
 do
-    for overlap in low_linked_only high_linked_only
+    for overlap in 0 low_linked_only high_linked_only
     do
         curr_outdir=${outputdir}/${jobid}_${algorithm}_${dataset}_${overlap}
         echo starting ${curr_outdir}
