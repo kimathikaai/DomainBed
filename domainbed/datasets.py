@@ -43,8 +43,8 @@ DATASETS = [
 ]
 
 # OVERLAP_TYPES = ["none", "low", "mid", "high", "full", "0", "33", "66", "100"]
-SPECIAL_OVERLAP_TYPES = ["low", "high", "low_linked_only", "high_linked_only"]
-OVERLAP_TYPES = ["low", "high", "low_linked_only", "high_linked_only"]
+SPECIAL_OVERLAP_TYPES = ["0", "low", "high", "low_linked_only", "high_linked_only"]
+OVERLAP_TYPES = ["0", "low", "high", "low_linked_only", "high_linked_only"]
 
 def get_domain_classes(N_c, N_oc, repeat, N_s, seed):
     N_noc = N_c - N_oc
