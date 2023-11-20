@@ -162,7 +162,7 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
         _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
 
-    elif algorithm == "FOND" or algorithm == "FOND_NC" or algorithm == "FOND_N" or algorithm == "NOC":
+    elif algorithm == "FOND" or algorithm == "FOND_NC" or algorithm == "FOND_N" or algorithm == "NOC" or algorithm == "FOND_Teacher":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
         _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
@@ -238,13 +238,13 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('weight_decay', 0., lambda r: 10**r.uniform(-6, -2))
 
     if dataset in SMALL_IMAGES:
-        _hparam('batch_size', 64, lambda r: int(2**r.uniform(3, 9)))
+        _hparam('batch_size', 8, lambda r: int(2**r.uniform(3, 9)))
     elif algorithm == 'ARM':
         _hparam('batch_size', 8, lambda r: 8)
     elif dataset == 'DomainNet':
-        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5)))
+        _hparam('batch_size', 8, lambda r: int(2**r.uniform(3, 5)))
     else:
-        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5.5)))
+        _hparam('batch_size', 8, lambda r: int(2**r.uniform(3, 5.5)))
 
     if algorithm in ['DANN', 'CDANN'] and dataset in SMALL_IMAGES:
         _hparam('lr_g', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
