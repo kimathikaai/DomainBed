@@ -2344,19 +2344,23 @@ class XDomBase(AbstractXDom):
 
 
 class FOND_Teacher(XDomBase):
-    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(FOND_Teacher, self).__init__(
-            input_shape, num_classes, num_domains, hparams
-        )
-        self.teacher = teacher
+                    input_shape, num_classes, num_domains, hparams
+                )
+    # def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+    #     super(FOND_Teacher, self).__init__(
+    #         input_shape, num_classes, num_domains, hparams
+    #     )
+    #     self.teacher = teacher
 
-        # Freeze the parameters of the teacher network
-        for param in self.teacher.classifier.parameters():
-            param.requires_grad = False
-        for param in self.teacher.featurizer.parameters():
-            param.requires_grad = False
-        for param in self.teacher.projector.parameters():
-            param.requires_grad = False
+    #     # Freeze the parameters of the teacher network
+    #     for param in self.teacher.classifier.parameters():
+    #         param.requires_grad = False
+    #     for param in self.teacher.featurizer.parameters():
+    #         param.requires_grad = False
+    #     for param in self.teacher.projector.parameters():
+    #         param.requires_grad = False
 
     def preprocess(self, minibatches):
         # NOTE: current implementations doesn't create duplicates
@@ -2364,11 +2368,11 @@ class FOND_Teacher(XDomBase):
 
         num_domains = len(minibatches)
         features_student = [self.featurizer(xi) for xi, _ in minibatches]
-        features_teacher = [self.teacher.featurizer(xi) for xi, _ in minibatches]
+        # features_teacher = [self.teacher.featurizer(xi) for xi, _ in minibatches]
 
-        projections_student = [F.normalize(self.projector(fi)) for fi in features]
-        projections_teacher = [F.normalize(self.projector(fi)) for fi in features]
-        classifs = [self.classifier(fi) for fi in features]
+        projections_student = [F.normalize(self.projector(fi)) for fi in features_student]
+        # projections_teacher = [F.normalize(self.teacher.projector(fi)) for fi in features_teacher]
+        # classifs = [self.classifier(fi) for fi in features_teacher]
         targets = [yi for _, yi in minibatches]
 
         # create domain labels
@@ -2385,10 +2389,10 @@ class FOND_Teacher(XDomBase):
 
         return {
             "features_student": features_student,
-            "features_teacher": features_teacher,
+            # "features_teacher": features_teacher,
             "projections_student": projections_student,
-            "projections_teacher": projections_teacher,
-            "classifs": classifs,
+            # "projections_teacher": projections_teacher,
+            # "classifs": classifs,
             "targets": targets,
             "domains": domains,
             "num_domains": num_domains,
@@ -2399,24 +2403,38 @@ class FOND_Teacher(XDomBase):
 
         domains = torch.cat(values["domains"])
         targets = torch.cat(values["targets"])
-        classifs = torch.cat(values["classifs"])
+        # classifs = torch.cat(values["classifs"])
 
         features_student = torch.cat(values["features_student"])
-        features_teacher = torch.cat(values["features_teacher"])
+        # features_teacher = torch.cat(values["features_teacher"])
         projections_student = torch.cat(values["projections_student"])
-        projections_teacher = torch.cat(values["projections_teacher"])
+        # projections_teacher = torch.cat(values["projections_teacher"])
 
-        # if it is domain-linked
-        soft_projections_student = F.softmax(projections_students)
-        soft_projections_teacher = F.softmax(projections_teacher)
-        masked_projections_student = torch.masked_select(
-            soft_projections_student, self.noc_weight
-        )
-        masked_projections_teacher = torch.masked_select(
-            soft_projections_teacher, self.noc_weight
+        noc_mask = self.noc_weight[targets].type(torch.bool)
+        soft_projections_student = F.softmax(projections_student[noc_mask])
+        soft_projections_teacher = F.softmax(projections_teacher[noc_mask])
+
+        teacher_loss = F.kl_div(soft_projections_student, soft_projections_teacher)
+
+        masks = self.get_masks(Y=targets, D=domains)
+
+        alpha = (
+            ~masks["diff_domain_same_class_mask"]
+            + masks["diff_domain_same_class_mask"] * self.xda_alpha
         )
 
-        teacher_loss = F.kl_div(masked_projections_student, masked_projections_teacher)
+        beta = (
+            ~masks["same_domain_diff_class_mask"]
+            + masks["same_domain_diff_class_mask"] * self.xda_beta
+        )
+
+        xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
+            projections=projections,
+            positive_mask=masks["same_class_mask"] * masks["self_mask"],
+            negative_mask=masks["self_mask"],
+            alpha=alpha,
+            beta=beta,
+        )
 
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(class_loss):
@@ -2424,7 +2442,9 @@ class FOND_Teacher(XDomBase):
         if torch.isnan(teacher_loss):
             teacher_loss = torch.tensor(0).to(targets.device)
 
-        loss = class_loss + teacher_loss
+        loss = (
+            class_loss + teacher_loss + self.xdom_lmbd * xdom_loss
+        )
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2434,6 +2454,15 @@ class FOND_Teacher(XDomBase):
             "loss": loss.item(),
             "class_loss": class_loss.item(),
             "teacher_loss": teacher_loss.item(),
+        }
+
+        return {
+            "loss": loss.item(),
+            "class_loss": class_loss.item(),
+            "xdom_loss": xdom_loss.item(),
+            "teacher_loss": teacher_loss.item(),
+            "mean_p": mean_positives_per_sample.item(),
+            "zero_p": num_zero_positives.item(),
         }
 
 
