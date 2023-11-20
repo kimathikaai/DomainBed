@@ -2348,19 +2348,19 @@ class FOND_Teacher(XDomBase):
         super(FOND_Teacher, self).__init__(
                     input_shape, num_classes, num_domains, hparams
                 )
-    # def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
-    #     super(FOND_Teacher, self).__init__(
-    #         input_shape, num_classes, num_domains, hparams
-    #     )
-    #     self.teacher = teacher
+    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+        super(FOND_Teacher, self).__init__(
+            input_shape, num_classes, num_domains, hparams
+        )
+        self.teacher = teacher
 
-    #     # Freeze the parameters of the teacher network
-    #     for param in self.teacher.classifier.parameters():
-    #         param.requires_grad = False
-    #     for param in self.teacher.featurizer.parameters():
-    #         param.requires_grad = False
-    #     for param in self.teacher.projector.parameters():
-    #         param.requires_grad = False
+        # Freeze the parameters of the teacher network
+        for param in self.teacher.classifier.parameters():
+            param.requires_grad = False
+        for param in self.teacher.featurizer.parameters():
+            param.requires_grad = False
+        for param in self.teacher.projector.parameters():
+            param.requires_grad = False
 
     def preprocess(self, minibatches):
         # NOTE: current implementations doesn't create duplicates
@@ -2368,11 +2368,11 @@ class FOND_Teacher(XDomBase):
 
         num_domains = len(minibatches)
         features_student = [self.featurizer(xi) for xi, _ in minibatches]
-        # features_teacher = [self.teacher.featurizer(xi) for xi, _ in minibatches]
+        features_teacher = [self.teacher.featurizer(xi) for xi, _ in minibatches]
 
         projections_student = [F.normalize(self.projector(fi)) for fi in features_student]
-        # projections_teacher = [F.normalize(self.teacher.projector(fi)) for fi in features_teacher]
-        # classifs = [self.classifier(fi) for fi in features_teacher]
+        projections_teacher = [F.normalize(self.teacher.projector(fi)) for fi in features_teacher]
+        classifs = [self.classifier(fi) for fi in features_teacher]
         targets = [yi for _, yi in minibatches]
 
         # create domain labels
@@ -2389,10 +2389,10 @@ class FOND_Teacher(XDomBase):
 
         return {
             "features_student": features_student,
-            # "features_teacher": features_teacher,
+            "features_teacher": features_teacher,
             "projections_student": projections_student,
-            # "projections_teacher": projections_teacher,
-            # "classifs": classifs,
+            "projections_teacher": projections_teacher,
+            "classifs": classifs,
             "targets": targets,
             "domains": domains,
             "num_domains": num_domains,
@@ -2403,12 +2403,12 @@ class FOND_Teacher(XDomBase):
 
         domains = torch.cat(values["domains"])
         targets = torch.cat(values["targets"])
-        # classifs = torch.cat(values["classifs"])
+        classifs = torch.cat(values["classifs"])
 
         features_student = torch.cat(values["features_student"])
-        # features_teacher = torch.cat(values["features_teacher"])
+        features_teacher = torch.cat(values["features_teacher"])
         projections_student = torch.cat(values["projections_student"])
-        # projections_teacher = torch.cat(values["projections_teacher"])
+        projections_teacher = torch.cat(values["projections_teacher"])
 
         noc_mask = self.noc_weight[targets].type(torch.bool)
         soft_projections_student = F.softmax(projections_student[noc_mask])
