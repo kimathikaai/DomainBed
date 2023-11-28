@@ -2458,11 +2458,6 @@ class FOND_Teacher(XDomBase):
         loss.backward()
         self.optimizer.step()
 
-        return {
-            "loss": loss.item(),
-            "class_loss": class_loss.item(),
-            "teacher_loss": teacher_loss.item(),
-        }
 
         return {
             "loss": loss.item(),
