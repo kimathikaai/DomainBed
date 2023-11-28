@@ -162,13 +162,23 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
         _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
 
-    elif algorithm == "FOND" or algorithm == "FOND_NC" or algorithm == "FOND_N" or algorithm == "NOC" or algorithm == "FOND_Teacher":
+    elif algorithm == "FOND" or algorithm == "FOND_NC" or algorithm == "FOND_N" or algorithm == "NOC":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
         _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
         _hparam('error_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
         _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
         _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
+
+    elif algorithm == "FOND_Teacher":
+        _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
+        _hparam('base_temperature', 0.07, lambda r: 0.07)
+        _hparam('xdom_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('error_lmbd', 1, lambda r: 10**r.uniform(-1, 3))
+        _hparam('xda_alpha', 1, lambda r: 10**r.uniform(0, 1))
+        _hparam('xda_beta', 1, lambda r: 10**r.uniform(0, 1))
+        _hparam('teacher_setting', "separate_projector", lambda r: r.choice(["separate_projector", "teacher_projector", "student_projector"]))
+        _hparam('distillation_temperature', 1, lambda r: r.uniform(1, 20))
 
     elif algorithm == "XMLDG":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
