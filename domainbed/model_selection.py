@@ -165,6 +165,7 @@ class IIDAccuracySelectionMethod(SelectionMethod):
         results_dict = {
             'val_acc': np.mean([record[key]*weight for key, weight in val_env_keys]), # average of 20% split of train envs
             'test_acc': np.mean([record[key]*weight for key, weight in test_env_keys]), # average of 80% split of train envs
+            'step': record['step']
             # 'test_acc': record[test_in_acc_key] # 80% split of the test env
         }
         return results_dict
