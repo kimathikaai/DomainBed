@@ -2377,7 +2377,7 @@ class FOND_Distillation(XDomBase):
         elif self.teacher_setting == "teacher_projector":
             projections_student = [F.normalize(self.teacher.projector(fi)) for fi in features_student]
             projections_teacher = [F.normalize(self.teacher.projector(fi)) for fi in features_teacher]
-        elif self.student_projector == "student_projector":
+        elif self.teacher_setting == "student_projector":
             projections_student = [F.normalize(self.projector(fi)) for fi in features_student]
             projections_teacher = [F.normalize(self.projector(fi)) for fi in features_teacher]
         else:
