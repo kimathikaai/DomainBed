@@ -83,7 +83,7 @@ class ResNet(torch.nn.Module):
         super(ResNet, self).__init__()
         resnet18 = hparams['resnet18']
         if resnet18:
-            pretrain_weight = os.path.expanduser("./scratch/saved/resnet18-f37072fd.pth")
+            pretrain_weight = os.path.expanduser("~/scratch/saved/resnet18-f37072fd.pth")
             assert os.path.isfile(pretrain_weight), f"File not found: {pretrain_weight}"
             if os.path.exists(pretrain_weight):
                 print(
