@@ -71,7 +71,10 @@ ALGORITHMS = [
     'PGrad',
     'FOND_NC',
     'FOND_N',
-    'NOC'
+    'NOC',
+    'FOND_Distillation_Separate_Projector',
+    'FOND_Distillation_Teacher_Projector',
+    'FOND_Distillation_Student_Projector'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2343,12 +2346,12 @@ class XDomBase(AbstractXDom):
         }
 
 
-class FOND_Teacher(XDomBase):
+class FOND_Distillation(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
-        super(FOND_Teacher, self).__init__(
+        super(FOND_Distillation, self).__init__(
                     input_shape, num_classes, num_domains, hparams
                 )
-        self.teacher_setting = hparams["teacher_setting"]
+        self.teacher_setting = None
         self.distillation_temperature = hparams["distillation_temperature"]
         self.teacher = teacher
 
@@ -2437,7 +2440,7 @@ class FOND_Teacher(XDomBase):
         )
 
         xdom_loss, mean_positives_per_sample, num_zero_positives = self.supcon_loss(
-            projections=projections,
+            projections=projections_student,
             positive_mask=masks["same_class_mask"] * masks["self_mask"],
             negative_mask=masks["self_mask"],
             alpha=alpha,
@@ -2468,7 +2471,27 @@ class FOND_Teacher(XDomBase):
             "zero_p": num_zero_positives.item(),
         }
 
+class FOND_Distillation_Separate_Projector(FOND_Distillation):
+    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+        super(FOND_Distillation_Separate_Projector, self).__init__(
+                    input_shape, num_classes, num_domains, hparams, teacher
+                )
+        self.teacher_setting = "separate_projector"
 
+class FOND_Distillation_Teacher_Projector(FOND_Distillation):
+    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+        super(FOND_Distillation_Teacher_Projector, self).__init__(
+                    input_shape, num_classes, num_domains, hparams, teacher
+                )
+        self.teacher_setting = "teacher_projector"
+
+class FOND_Distillation_Student_Projector(FOND_Distillation):
+    def __init__(self, input_shape, num_classes, num_domains, hparams, teacher):
+        super(FOND_Distillation_Student_Projector, self).__init__(
+                    input_shape, num_classes, num_domains, hparams, teacher
+                )
+        self.teacher_setting = "student_projector"
+        
 class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(FOND, self).__init__(input_shape, num_classes, num_domains, hparams)
