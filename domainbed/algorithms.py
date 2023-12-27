@@ -2421,7 +2421,7 @@ class FOND_Distillation(XDomBase):
         projections_student = torch.cat(values["projections_student"])
         projections_teacher = torch.cat(values["projections_teacher"])
 
-        noc_mask = self.noc_weight[targets].type(torch.bool)
+        noc_mask = self.noc_weight.to(targets.device)[targets].type(torch.bool)
         soft_projections_student = F.softmax(projections_student[noc_mask]/self.distillation_temperature)
         soft_projections_teacher = F.softmax(projections_teacher[noc_mask]/self.distillation_temperature)
 
