@@ -10,15 +10,15 @@
 
 for overlap in 33 66
 do
-    input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/'$overlap
-    # input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/iclr2024/'$overlap
+    # input_dir='/Users/kimathikaai/scratch/saved/domainbed_results/'$overlap
+    input_dir="/Users/kimathikaai/scratch/saved/domainbed_results/iclr2024/${overlap}/pacs"
 
     dataset='All'
-    for selec_metric in macc vacc acc nacc oacc f1
-    # for selec_metric in nacc
+    # for selec_metric in macc vacc acc nacc oacc f1
+    for selec_metric in nacc
     do
-        for eval_metric in macc vacc acc nacc oacc f1
-        # for eval_metric in nacc
+        # for eval_metric in macc vacc acc nacc oacc f1
+        for eval_metric in nacc
         do
             python -m domainbed.scripts.collect_results\
                 --input_dir=$input_dir \

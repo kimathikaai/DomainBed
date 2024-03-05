@@ -47,6 +47,7 @@ ABLATIONS = [
     METHOD_NAME + r"\F",
     METHOD_NAME,
     METHOD_NAME + r"\FBA",
+    # "NOC"
 ]
 
 # ABLATIONS = list(RENAMES.values()).remove('CausIRL')
@@ -55,7 +56,7 @@ AXIS_LABELS = {
     "nacc": r"Domain-Linked ($\mathcal{Y}_{L}$) Accuracy",
     "oacc": r"Domain-Shared ($\mathcal{Y}_{S}$) Accuracy",
     "av_acc": r"Average ($C_{O},C_{N}$) Accuracy",
-    "macc": "All-Class Accuracy",
+    "macc": "Macro-Class Accuracy",
     "vacc": "rAverage ($C_{O},C_{N}$) Accuracy",
     "f1": "F1-Score",
     "33": "low",
@@ -63,7 +64,7 @@ AXIS_LABELS = {
 }
 
 # BASELINE_MARKERS = ["o"]
-ABLATION_MARKERS = ["D", "p", "v", "X"]
+ABLATION_MARKERS = ["D", "p", "v", "X", "o"]
 BASELINE_MARKERS = [
     ">",
     "o",
