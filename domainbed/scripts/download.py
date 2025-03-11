@@ -275,15 +275,23 @@ def download_spawrious(data_dir, remove=True):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Download datasets')
     parser.add_argument('--data_dir', type=str, required=True)
+    parser.add_argument('--pacs', action='store_true')
+    parser.add_argument('--vlcs', action='store_true')
+    parser.add_argument('--office_home', action='store_true')
+    parser.add_argument('--camelyon17', action='store_true')
     args = parser.parse_args()
 
     # download_mnist(args.data_dir)
-    download_pacs(args.data_dir)
-    download_office_home(args.data_dir)
+    if args.pacs:
+        download_pacs(args.data_dir)
+    if args.office_home:
+        download_office_home(args.data_dir)
+    if args.vlcs:
+        download_vlcs(args.data_dir)
+    if args.camelyon17:
+        Camelyon17Dataset(root_dir=args.data_dir, download=True)
     # download_domain_net(args.data_dir)
-    download_vlcs(args.data_dir)
     # download_terra_incognita(args.data_dir)
     # download_spawrious(args.data_dir)
     # download_sviro(args.data_dir)
-    # Camelyon17Dataset(root_dir=args.data_dir, download=True)
     # FMoWDataset(root_dir=args.data_dir, download=True)

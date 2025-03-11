@@ -38,8 +38,7 @@ Refer to [hparams_registry.py](domainbed/hparams_registry.py) for hyper-paramete
 Download the datasets:
 
 ```bash
-python3 -m domainbed.scripts.download \
-       --data_dir=./domainbed/data
+./scripts/download_dataset.sh
 ```
 
 Train a model:
