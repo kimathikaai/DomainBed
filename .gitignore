@@ -3,6 +3,7 @@ domainbed/facebook.py
 **/.ipynb_checkpoints/*
 venv/*
 .DS_Store
+tmp/*
 
 domainbed/data/*
 train_output/*
