@@ -21,6 +21,7 @@ import torchvision
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
 import pytorch_lightning as pl
+from dotenv import load_dotenv
 
 from domainbed import datasets
 from domainbed import hparams_registry
@@ -99,6 +100,7 @@ if __name__ == "__main__":
         print('\t{}: {}'.format(k, v))
 
     ####------ Wandb
+    load_dotenv() # Get API Key
     wandb.init(
         name=Path(args.output_dir).stem,
         project=args.wandb_project,
