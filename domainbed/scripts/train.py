@@ -9,6 +9,9 @@ import sys
 import time
 import uuid
 import copy
+import wandb
+from pathlib import Path
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -43,20 +46,23 @@ if __name__ == "__main__":
         help='Seed for everything else')
     parser.add_argument('--steps', type=int, default=None,
         help='Number of steps. Default is dataset-dependent.')
-    parser.add_argument('--checkpoint_freq', type=int, default=None,
-        help='Checkpoint every N steps. Default is dataset-dependent.')
     parser.add_argument('--test_envs', type=int, nargs='+', default=[0])
-    parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--uda_holdout_fraction', type=float, default=0,
         help="For domain adaptation, % of test to use unlabeled for training.")
-    parser.add_argument('--skip_model_save', action='store_true')
-    parser.add_argument('--save_model_every_checkpoint', action='store_true')
 
     parser.add_argument('--tsne_data_lim', type=int, default=-1,
         help='number of datapoints per domain for tsne plots (-1 for no limit)')
     parser.add_argument('--overlap', type=str, choices=datasets.OVERLAP_TYPES)
     parser.add_argument('--overlap_seed', type=int, default = 0)
+
+    # Logging
+    parser.add_argument('--output_dir', type=str, default="train_output")
+    parser.add_argument('--checkpoint_freq', type=int, default=None,
+        help='Checkpoint every N steps. Default is dataset-dependent.')
+    parser.add_argument('--skip_model_save', action='store_true')
+    parser.add_argument('--save_model_every_checkpoint', action='store_true')
+    parser.add_argument("--wandb_project", type=str, default='fond')
 
     args = parser.parse_args()
 
@@ -73,18 +79,34 @@ if __name__ == "__main__":
     tb_writer = SummaryWriter(
         args.output_dir+f".{args.dataset}.{args.overlap}.{args.test_envs[0]}")
 
-    print("Environment:")
-    print("\tPython: {}".format(sys.version.split(" ")[0]))
-    print("\tPyTorch: {}".format(torch.__version__))
-    print("\tTorchvision: {}".format(torchvision.__version__))
-    print("\tCUDA: {}".format(torch.version.cuda))
-    print("\tCUDNN: {}".format(torch.backends.cudnn.version()))
-    print("\tNumPy: {}".format(np.__version__))
-    print("\tPIL: {}".format(PIL.__version__))
+    # Environment
+    environment_state = {
+        "nvidia-smi": subprocess.check_output(["nvidia-smi"]).decode(),
+        "Python": sys.version.split(" ")[0],
+        "PyTorch": torch.__version__,
+        "Torchvision": torchvision.__version__,
+        "CUDA": torch.version.cuda,
+        "CUDNN": torch.backends.cudnn.version(),
+        "NumPy": np.__version__,
+        "PIL": PIL.__version__,
+    }
+    print("Environment:\n",environment_state)
+    for k, v in environment_state.items():
+        print('\t{}: {}'.format(k, v))
 
     print('Args:')
     for k, v in sorted(vars(args).items()):
         print('\t{}: {}'.format(k, v))
+
+    ####------ Wandb
+    wandb.init(
+        name=Path(args.output_dir).stem,
+        project=args.wandb_project,
+        dir=args.output_dir,
+        # mode="offline" if args.offline_wandb else "online",
+    )
+    wandb.config.update(environment_state)
+    wandb.config.update({'args': vars(args)})
 
     if args.hparams_seed == 0:
         hparams = hparams_registry.default_hparams(args.algorithm, args.dataset)
@@ -97,6 +119,8 @@ if __name__ == "__main__":
     print('HParams:')
     for k, v in sorted(hparams.items()):
         print('\t{}: {}'.format(k, v))
+
+    wandb.config.update({'hparams': hparams})
 
     pl.seed_everything(args.seed)
     torch.backends.cudnn.deterministic = True
@@ -232,6 +256,7 @@ if __name__ == "__main__":
 
         for key, val in step_vals.items():
             checkpoint_vals[key].append(val)
+            wandb.log({f"step/{key}": val, 'step': step, 'epoch':step/steps_per_epoch})
 
         if (step % checkpoint_freq == 0) or (step == n_steps - 1):
             results = {
@@ -244,6 +269,11 @@ if __name__ == "__main__":
                     raise Exception(f"{key}: {np.mean(val)}")
                 results[key] = np.mean(val)
                 tb_writer.add_scalar(key, np.mean(val), step)
+                wandb.log({
+                    f"checkpoint/{key}": np.mean(val), 
+                    'step': step, 
+                    'epoch':step/steps_per_epoch
+                })
 
             tsne_dfs = []
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
@@ -273,6 +303,11 @@ if __name__ == "__main__":
                 # log metrics
                 for key, val in metric_values.items():
                     tb_writer.add_scalar(key, val, step)
+                    wandb.log({
+                        f"checkpoint/{key}": np.mean(val), 
+                        'step': step, 
+                        'epoch':step/steps_per_epoch
+                    })
 
                 # log hparams
                 if is_test_loader and "in" in name and step == n_steps - 1: 
@@ -281,6 +316,11 @@ if __name__ == "__main__":
                     for key, val in metric_values.items():
                         key = copy.deepcopy(key).replace(name, "test")
                         values.update({key:val})
+                        wandb.log({
+                            f"checkpoint/{key}": np.mean(val), 
+                            'step': step, 
+                            'epoch':step/steps_per_epoch
+                        })
 
                     hparams.pop("C_oc") # can't be stored
 
