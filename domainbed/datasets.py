@@ -662,6 +662,7 @@ class DomainBedWILDSDataset(MultipleDomainDataset):
         
         assert len(test_envs) == 1, "Not performing leave-one-domain-out validation"
 
+        self.num_classes=None
         if isinstance(dataset, Camelyon17Dataset):  
             self.idx_to_class = {0: "No Tumour", 1: "Tumour"}
             self.num_classes = 2
@@ -675,7 +676,8 @@ class DomainBedWILDSDataset(MultipleDomainDataset):
         if domain_class_filter is None:
             domain_class_filter = [list(range(self.num_classes)) for _ in range(num_envs-1)]
 
-        self.overlapping_classes = self.get_overlapping_classes(domain_class_filter, self.num_classes)
+        # Get the overlapping classes
+        self.overlapping_classes = get_overlapping_classes(domain_class_filter, self.num_classes)
 
         # Dynamically associate a filter with a domain except for test_envs[0]
         num_filters = len(domain_class_filter)
@@ -761,10 +763,12 @@ class WILDSCamelyon(DomainBedWILDSDataset):
     def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
         dataset = Camelyon17Dataset(root_dir=root)
         self.class_overlap = {
-            0: [[0], [0], [1], [1]],
-            33: [[0,1], [0], [1,0], [1]],
-            100: [[0,1], [0,1], [0,1], [0,1]],
+            1: [[0], [0], [0], [0,1]], # One hospital with tumour data
+            2: [[0], [0], [0,1], [0,1]], # Two hospitals with tumour data
+            3: [[0,1], [0,1], [0,1], [0,1]], # All hospitals with tumour data
+            4: [[1], [1], [1], [0,1]], # One hospital with tumour-free data
         }
+
         self.environment_names = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
         super().__init__(
