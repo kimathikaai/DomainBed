@@ -1,49 +1,51 @@
 #!/bin/bash
 
 # local variables
-datadir=/pub2/data
-outputdir=/pub2/podg
+datadir=/home/kkaai/scratch/data
+outputdir=/home/kkaai/scratch/saved/fond-logs
 n_hparams=5
 steps=5001
 trial=3
-gpu=1
-algorithm=PGrad
-jobid=iclr2024
+gpu=2
+jobid=tpami
 
-for dataset in PACS VLCS OfficeHome
+for overlap in 1 2
 do
-    for overlap in low high
+    for dataset in WILDSCamelyon
     do
-        curr_outdir=${outputdir}/${jobid}_${algorithm}_${dataset}_${overlap}
-        echo starting ${curr_outdir}
-        mkdir -p ${curr_outdir}
+        for algorithm in ERM CORAL
+        do
+            curr_outdir=${outputdir}/${jobid}_${algorithm}_${dataset}_${overlap}
+            echo starting ${curr_outdir}
+            mkdir -p ${curr_outdir}
 
-        # Remove incomplete runs
-        python -m domainbed.scripts.sweep delete_incomplete\
-           --data_dir=${datadir} \
-           --algorithms $algorithm \
-           --output_dir $curr_outdir\
-           --command_launcher local \
-           --overlap $overlap \
-           --steps ${steps} \
-           --single_test_envs \
-           --datasets=${dataset} \
-           --n_hparams ${n_hparams} \
-           --n_trials ${trial} \
-           --skip_confirmation
+            # Remove incomplete runs
+            python -m domainbed.scripts.sweep delete_incomplete\
+               --data_dir=${datadir} \
+               --algorithms $algorithm \
+               --output_dir $curr_outdir\
+               --command_launcher local \
+               --overlap $overlap \
+               --steps ${steps} \
+               --single_test_envs \
+               --datasets=${dataset} \
+               --n_hparams ${n_hparams} \
+               --n_trials ${trial} \
+               --skip_confirmation
 
-        CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
-           --data_dir=${datadir} \
-           --algorithms $algorithm \
-           --output_dir $curr_outdir\
-           --command_launcher local \
-           --overlap $overlap \
-           --steps ${steps} \
-           --single_test_envs \
-           --datasets=${dataset} \
-           --n_hparams ${n_hparams} \
-           --n_trials ${trial} \
-           --skip_confirmation
+            CUDA_VISIBLE_DEVICES=${gpu} python -m domainbed.scripts.sweep launch\
+               --data_dir=${datadir} \
+               --algorithms $algorithm \
+               --output_dir $curr_outdir\
+               --command_launcher local \
+               --overlap $overlap \
+               --steps ${steps} \
+               --single_test_envs \
+               --datasets=${dataset} \
+               --n_hparams ${n_hparams} \
+               --n_trials ${trial} \
+               --skip_confirmation
+        done
     done
 done
 
