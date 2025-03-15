@@ -760,7 +760,7 @@ class DomainBedWILDSDataset(MultipleDomainDataset):
 class WILDSCamelyon(DomainBedWILDSDataset):
     ENVIRONMENTS = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
-    def __init__(self, root, test_envs, hparams, overlap: str = "3"):
+    def __init__(self, root, test_envs, hparams, overlap: str = "3", overlap_seed=None):
         dataset = Camelyon17Dataset(root_dir=root)
         self.class_overlap = {
             "1": [[0], [0], [0], [0,1]], # One hospital with tumour data
