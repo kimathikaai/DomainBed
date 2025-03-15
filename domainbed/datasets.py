@@ -760,20 +760,20 @@ class DomainBedWILDSDataset(MultipleDomainDataset):
 class WILDSCamelyon(DomainBedWILDSDataset):
     ENVIRONMENTS = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
-    def __init__(self, root, test_envs, hparams, class_overlap_id: int = 100):
+    def __init__(self, root, test_envs, hparams, overlap: str = "3"):
         dataset = Camelyon17Dataset(root_dir=root)
         self.class_overlap = {
-            1: [[0], [0], [0], [0,1]], # One hospital with tumour data
-            2: [[0], [0], [0,1], [0,1]], # Two hospitals with tumour data
-            3: [[0,1], [0,1], [0,1], [0,1]], # All hospitals with tumour data
-            4: [[1], [1], [1], [0,1]], # One hospital with tumour-free data
+            "1": [[0], [0], [0], [0,1]], # One hospital with tumour data
+            "2": [[0], [0], [0,1], [0,1]], # Two hospitals with tumour data
+            "3": [[0,1], [0,1], [0,1], [0,1]], # All hospitals with tumour data
+            "4": [[1], [1], [1], [0,1]], # One hospital with tumour-free data
         }
 
         self.environment_names = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
         super().__init__(
             dataset, "hospital", test_envs, hparams['data_augmentation'], hparams,
-            self.environment_names, self.class_overlap[class_overlap_id])
+            self.environment_names, self.class_overlap[overlap])
 
 
 class WILDSFMoW(DomainBedWILDSDataset):
