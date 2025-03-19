@@ -20,7 +20,6 @@ import torch
 import torchvision
 import torch.utils.data
 from torch.utils.tensorboard import SummaryWriter
-import pytorch_lightning as pl
 from dotenv import load_dotenv
 
 from domainbed import datasets
