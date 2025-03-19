@@ -4,6 +4,7 @@ domainbed/facebook.py
 venv/*
 .DS_Store
 tmp/*
+.env
 
 domainbed/data/*
 train_output/*
