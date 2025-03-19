@@ -97,7 +97,7 @@ def all_test_env_combinations(n):
             yield [i, j]
 
 def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparams, steps,
-    data_dir, task, holdout_fraction, single_test_envs, hparams, overlaps):
+    data_dir, task, holdout_fraction, single_test_envs, test_env, hparams, overlaps):
     args_list = []
     for trial_seed in range(n_trials):
         for dataset in dataset_names:
@@ -108,6 +108,11 @@ def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparam
                 else:
                     all_test_envs = all_test_env_combinations(
                         datasets.num_environments(dataset))
+
+                if test_env is not None:
+                    assert test_env < datasets.num_environments(dataset)
+                    assert test_env >= 0
+                    all_test_envs = [[test_env]]
                 for test_envs in all_test_envs:
                     for hparams_seed in range(n_hparams_from, n_hparams):
                         for olap in overlaps:
@@ -156,6 +161,7 @@ if __name__ == "__main__":
     parser.add_argument('--hparams', type=str, default=None)
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--single_test_envs', action='store_true')
+    parser.add_argument('--test_env', type=int, default=None)
     parser.add_argument('--skip_confirmation', action='store_true')
     parser.add_argument('--overlaps', nargs='+', type=str)
     parser.add_argument('--str_overlap', action='store_true')
@@ -176,6 +182,7 @@ if __name__ == "__main__":
         task=args.task,
         holdout_fraction=args.holdout_fraction,
         single_test_envs=args.single_test_envs,
+        test_env=args.test_env,
         hparams=args.hparams,
         overlaps=args.overlaps
     )
