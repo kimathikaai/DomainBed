@@ -1,14 +1,16 @@
 #!/bin/bash
 
 # local variables
-datadir=/home/kkaai/scratch/data
-outputdir=/home/kkaai/scratch/saved/fond-logs
+# datadir=/home/kkaai/scratch/data
+# outputdir=/home/kkaai/scratch/saved/fond-logs
+datadir=/mnt/pub0/projects/fond/data
+outputdir=/mnt/pub0/projects/fond/saved/fond-logs
 n_hparams=3
 n_hparams_from=0
 steps=3001
 trial=3
 test_env=4
-gpu=2
+gpu=3
 jobid=tpami
 
 for overlap in 1
