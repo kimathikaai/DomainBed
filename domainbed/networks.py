@@ -264,7 +264,7 @@ class WholeFish(nn.Module):
         return self.net(x)
 
 # Copyright (c) Kakao Brain. All Rights Reserved.
-from .backbones import get_backbone
+# from .backbones import get_backbone
 
 
 BLOCKNAMES = {
