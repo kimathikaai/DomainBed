@@ -347,7 +347,7 @@ class URResNet(torch.nn.Module):
                 self.network = torchvision.models.resnet18(
                     weights=torchvision.models.ResNet18_Weights.IMAGENET1K_V1
                 )
-            hparams.model = 'resnet18'
+            hparams['model'] = 'resnet18'
 
             self.n_outputs = 512
             block_names = BLOCKNAMES["resnet"]
