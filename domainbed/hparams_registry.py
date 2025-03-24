@@ -223,6 +223,12 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('eqrm_burnin_iters', 2500, lambda r: 10 ** r.uniform(2.5, 3.5))
         _hparam('eqrm_lr', 1e-6, lambda r: 10 ** r.uniform(-7, -5))
 
+    elif algorithm == 'MIRO':
+        _hparam('feat_layers', 'stem_block', lambda r: 'stem_block')
+        _hparam('ld', 0.1, lambda r: 'stem_block')
+        _hparam('lr_multi', 10.0 , lambda r: 10.0)
+
+
 
     # Dataset-and-algorithm-specific hparam definitions. Each block of code
     # below corresponds to exactly one hparam. Avoid nested conditionals.
