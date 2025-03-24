@@ -3355,9 +3355,9 @@ class MIRO(Algorithm):
 
         self.optimizer = torch.optim.Adam(
             parameters,
-            hparams['optimizer']
-            # lr=self.hparams["lr"],
-            # weight_decay=self.hparams['weight_decay']
+            # hparams['optimizer']
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams['weight_decay']
         )
 
         # self.optimizer = get_optimizer(
