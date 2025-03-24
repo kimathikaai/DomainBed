@@ -3326,6 +3326,7 @@ class MIRO(Algorithm):
     """Mutual-Information Regularization with Oracle"""
     def __init__(self, input_shape, num_classes, num_domains, hparams, **kwargs):
         super().__init__(input_shape, num_classes, num_domains, hparams)
+        self.input_shape = input_shape
         self.pre_featurizer = networks.URFeaturizer(
             input_shape, self.hparams, freeze="all", feat_layers=hparams["feat_layers"]
         )
