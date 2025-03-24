@@ -3327,14 +3327,14 @@ class MIRO(Algorithm):
     def __init__(self, input_shape, num_classes, num_domains, hparams, **kwargs):
         super().__init__(input_shape, num_classes, num_domains, hparams)
         self.pre_featurizer = networks.URFeaturizer(
-            input_shape, self.hparams, freeze="all", feat_layers=hparams.feat_layers
+            input_shape, self.hparams, freeze="all", feat_layers=hparams["feat_layers"]
         )
         self.featurizer = networks.URFeaturizer(
-            input_shape, self.hparams, feat_layers=hparams.feat_layers
+            input_shape, self.hparams, feat_layers=hparams["feat_layers"]
         )
         self.classifier = nn.Linear(self.featurizer.n_outputs, num_classes)
         self.network = nn.Sequential(self.featurizer, self.classifier)
-        self.ld = hparams.ld
+        self.ld = hparams['ld']
 
         # build mean/var encoders
         shapes = get_shapes(self.pre_featurizer, self.input_shape)
@@ -3348,8 +3348,8 @@ class MIRO(Algorithm):
         # optimizer
         parameters = [
             {"params": self.network.parameters()},
-            {"params": self.mean_encoders.parameters(), "lr": hparams.lr * hparams.lr_mult},
-            {"params": self.var_encoders.parameters(), "lr": hparams.lr * hparams.lr_mult},
+            {"params": self.mean_encoders.parameters(), "lr": hparams['lr'] * hparams['lr_multi']},
+            {"params": self.var_encoders.parameters(), "lr": hparams['lr'] * hparams['lr_multi']},
         ]
 
         self.optimizer = torch.optim.Adam(
