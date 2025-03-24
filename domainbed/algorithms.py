@@ -3367,9 +3367,12 @@ class MIRO(Algorithm):
         #     weight_decay=self.hparams["weight_decay"],
         # )
 
-    def update(self, x, y, **kwargs):
-        all_x = torch.cat(x)
-        all_y = torch.cat(y)
+    # def update(self, x, y, **kwargs):
+    def update(self, minibatches, unlabeled=None):
+        all_x = torch.cat([x for x, y in minibatches])
+        all_y = torch.cat([y for x, y in minibatches])
+        # all_x = torch.cat(x)
+        # all_y = torch.cat(y)
         feat, inter_feats = self.featurizer(all_x, ret_feats=True)
         logit = self.classifier(feat)
         loss = F.cross_entropy(logit, all_y)
