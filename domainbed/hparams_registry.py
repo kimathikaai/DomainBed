@@ -225,7 +225,7 @@ def _hparams(algorithm, dataset, random_seed):
 
     elif algorithm == 'MIRO':
         _hparam('feat_layers', 'stem_block', lambda r: 'stem_block')
-        _hparam('ld', 0.1, lambda r: 'stem_block')
+        _hparam('ld', 0.1, lambda r: 0.1)
         _hparam('lr_multi', 10.0 , lambda r: 10.0)
 
 
