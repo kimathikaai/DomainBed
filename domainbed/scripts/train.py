@@ -140,7 +140,7 @@ if __name__ == "__main__":
             args.test_envs, hparams, overlap = args.overlap, 
             overlap_seed=args.overlap_seed)
         hparams["C_oc"] = dataset.overlapping_classes
-        wandb.config.update({'hparams': hparams})
+        wandb.config.update({'C_oc': dataset.overlapping_classes})
     else:
         raise NotImplementedError
 
