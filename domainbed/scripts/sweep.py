@@ -134,7 +134,7 @@ def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparam
                             assert str(olap) in datasets.OVERLAP_TYPES
                             train_args["overlap"] = olap
                             if use_swad is not None:
-                                train_args['use_swad'] = True
+                                train_args['use_swad'] = 1
                             args_list.append(train_args)
     return args_list
 

@@ -65,7 +65,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_model_every_checkpoint', action='store_true')
     parser.add_argument("--wandb_project", type=str, default='fond')
 
-    parser.add_argument('--use_swad', action='store_true')
+    parser.add_argument('--use_swad', type=int, choices=[0,1], default=0)
 
     args = parser.parse_args()
 
@@ -232,7 +232,7 @@ if __name__ == "__main__":
 
     ####------ SWAD
     swad = None
-    if args.use_swad:
+    if args.use_swad == 1:
         swad_algorithm = swa_utils.AveragedModel(algorithm)
         swad_cls = getattr(swad_module, "LossValley")
         swad = swad_cls(evaluator=None, **hparams["swad_kwargs"])
