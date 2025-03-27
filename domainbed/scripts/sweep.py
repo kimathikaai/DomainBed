@@ -97,7 +97,7 @@ def all_test_env_combinations(n):
             yield [i, j]
 
 def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparams, steps,
-    data_dir, task, holdout_fraction, single_test_envs, test_env, hparams, overlaps):
+    data_dir, task, holdout_fraction, single_test_envs, test_env, hparams, overlaps, use_swad):
     args_list = []
     for trial_seed in range(n_trials):
         for dataset in dataset_names:
@@ -133,6 +133,8 @@ def make_args_list(n_trials, dataset_names, algorithms, n_hparams_from, n_hparam
                                 train_args['hparams'] = hparams
                             assert str(olap) in datasets.OVERLAP_TYPES
                             train_args["overlap"] = olap
+                            if use_swad is not None:
+                                train_args['use_swad'] = True
                             args_list.append(train_args)
     return args_list
 
@@ -165,6 +167,8 @@ if __name__ == "__main__":
     parser.add_argument('--skip_confirmation', action='store_true')
     parser.add_argument('--overlaps', nargs='+', type=str)
     parser.add_argument('--str_overlap', action='store_true')
+
+    parser.add_argument('--use_swad', action='store_true')
     # parser.add_argument('--overlap', type=str, choices=datasets.OVERLAP_TYPES)
     args = parser.parse_args()
 
@@ -184,7 +188,8 @@ if __name__ == "__main__":
         single_test_envs=args.single_test_envs,
         test_env=args.test_env,
         hparams=args.hparams,
-        overlaps=args.overlaps
+        overlaps=args.overlaps,
+        use_swad=args.use_swad
     )
 
     jobs = [Job(train_args, args.output_dir) for train_args in args_list]
