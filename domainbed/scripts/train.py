@@ -140,6 +140,7 @@ if __name__ == "__main__":
             args.test_envs, hparams, overlap = args.overlap, 
             overlap_seed=args.overlap_seed)
         hparams["C_oc"] = dataset.overlapping_classes
+        wandb.config.update({'C_oc': dataset.overlapping_classes})
     else:
         raise NotImplementedError
 
@@ -326,9 +327,9 @@ if __name__ == "__main__":
                             'epoch':step/steps_per_epoch
                         })
 
-                    hparams.pop("C_oc") # can't be stored
-
-                    tb_writer.add_hparams(hparams,values)
+                    # hparams.pop("C_oc") # can't be stored
+                    #
+                    # tb_writer.add_hparams(hparams,values)
             
             if step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)

@@ -16,7 +16,7 @@ import numpy as np
 import torch
 import torchmetrics
 from collections import Counter
-from itertools import cycle
+from itertools import cycle, chain
 
 import pandas as pd
 from sklearn.manifold import TSNE
@@ -679,3 +679,34 @@ class Nonparametric(Distribution1D):
             log_y = q
             v = torch.mean(self.data + self.bw * math.sqrt(-2 * log_y))
             return v
+
+def zip_strict(*iterables):
+    """strict version of zip. The length of iterables should be same.
+
+    NOTE yield looks non-reachable, but they are required.
+    """
+    # For trivial cases, use pure zip.
+    if len(iterables) < 2:
+        return zip(*iterables)
+
+    # Tail for the first iterable
+    first_stopped = False
+    def first_tail():
+        nonlocal first_stopped
+        first_stopped = True
+        return
+        yield
+
+    # Tail for the zip
+    def zip_tail():
+        if not first_stopped:
+            raise ValueError('zip_equal: first iterable is longer')
+        for _ in chain.from_iterable(rest):
+            raise ValueError('zip_equal: first iterable is shorter')
+            yield
+
+    # Put the pieces together
+    iterables = iter(iterables)
+    first = chain(next(iterables), first_tail())
+    rest = list(map(iter, iterables))
+    return chain(zip(first, *rest), zip_tail())
