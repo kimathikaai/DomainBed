@@ -1,15 +1,16 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 
 # fmt: off
-import torch
+import copy
 import random
+from collections import OrderedDict
+
+import numpy as np
+import torch
+import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.autograd as autograd
 
-import copy
-import numpy as np
-from collections import OrderedDict
 try:
     from backpack import backpack, extend
     from backpack.extensions import BatchGrad
@@ -17,11 +18,10 @@ except:
     backpack = None
 
 from domainbed import networks
-from domainbed.lib.misc import (
-    random_pairs_of_minibatches, split_meta_train_test, ParamDict,
-    MovingAverage, l2_between_dicts, proj, Nonparametric, zip_strict
-)
-
+from domainbed.lib.misc import (MovingAverage, Nonparametric, ParamDict,
+                                SupConLossLambda, l2_between_dicts, proj,
+                                random_pairs_of_minibatches,
+                                split_meta_train_test, zip_strict)
 
 ALGORITHMS = [
     'ERM',
@@ -72,7 +72,10 @@ ALGORITHMS = [
     'FOND_NC',
     'FOND_N',
     'NOC',
-    'MIRO'
+    'MIRO',
+    'RDM',
+    'URM',
+    'ADRMX'
 ]
 
 def get_algorithm_class(algorithm_name):
@@ -2070,6 +2073,7 @@ class EQRM(ERM):
 
         return {'loss': loss.item()}
 
+
 # fmt: on
 class AbstractXDom(ERM):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2347,6 +2351,7 @@ class FOND(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
         super(FOND, self).__init__(input_shape, num_classes, num_domains, hparams)
 
+
 # FOND with a non overlapping class loss and overall class loss
 class FOND_NC(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -2394,9 +2399,7 @@ class FOND_NC(XDomBase):
             noc_class_loss = torch.tensor(0).to(targets.device)
 
         loss = (
-            class_loss
-            + self.xdom_lmbd * xdom_loss
-            + self.error_lmbd * noc_class_loss
+            class_loss + self.xdom_lmbd * xdom_loss + self.error_lmbd * noc_class_loss
         )
 
         self.optimizer.zero_grad()
@@ -2412,6 +2415,7 @@ class FOND_NC(XDomBase):
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
 
 # FOND with a non overlapping class loss, but no overall class loss
 class FOND_N(XDomBase):
@@ -2457,12 +2461,9 @@ class FOND_N(XDomBase):
             error_loss = torch.tensor(0).to(targets.device)
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(noc_class_loss):
-            noc_class_loss = torch.tensor(0).to(targets.device)    
+            noc_class_loss = torch.tensor(0).to(targets.device)
 
-        loss = (
-            self.xdom_lmbd * xdom_loss
-            + noc_class_loss
-        )
+        loss = self.xdom_lmbd * xdom_loss + noc_class_loss
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2477,6 +2478,7 @@ class FOND_N(XDomBase):
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
         }
+
 
 # Just NOC loss
 class NOC(XDomBase):
@@ -2522,11 +2524,11 @@ class NOC(XDomBase):
             error_loss = torch.tensor(0).to(targets.device)
         class_loss = F.cross_entropy(classifs, targets)
         if torch.isnan(noc_class_loss):
-            noc_class_loss = torch.tensor(0, requires_grad=True, dtype=torch.float).to(targets.device)
-            
-        loss = (
-            noc_class_loss
-        )
+            noc_class_loss = torch.tensor(0, requires_grad=True, dtype=torch.float).to(
+                targets.device
+            )
+
+        loss = noc_class_loss
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -2540,7 +2542,8 @@ class NOC(XDomBase):
             "noc_class_loss": noc_class_loss.item(),
             "mean_p": mean_positives_per_sample.item(),
             "zero_p": num_zero_positives.item(),
-        }        
+        }
+
 
 class FOND_F(XDomBase):
     def __init__(self, input_shape, num_classes, num_domains, hparams):
@@ -3263,9 +3266,10 @@ class PGrad(Fish):
     def predict(self, x):
         return self.network(x)
 
+
 class ForwardModel(nn.Module):
-    """Forward model is used to reduce gpu memory usage of SWAD.
-    """
+    """Forward model is used to reduce gpu memory usage of SWAD."""
+
     def __init__(self, network):
         super().__init__()
         self.network = network
@@ -3279,6 +3283,7 @@ class ForwardModel(nn.Module):
 
 class MeanEncoder(nn.Module):
     """Identity function"""
+
     def __init__(self, shape):
         super().__init__()
         self.shape = shape
@@ -3289,6 +3294,7 @@ class MeanEncoder(nn.Module):
 
 class VarianceEncoder(nn.Module):
     """Bias-only model with diagonal covariance"""
+
     def __init__(self, shape, init=0.1, channelwise=True, eps=1e-5):
         super().__init__()
         self.shape = shape
@@ -3300,7 +3306,7 @@ class VarianceEncoder(nn.Module):
             if len(shape) == 4:
                 # [B, C, H, W]
                 b_shape = (1, shape[1], 1, 1)
-            elif len(shape ) == 3:
+            elif len(shape) == 3:
                 # CLIP-ViT: [H*W+1, B, C]
                 b_shape = (1, 1, shape[2])
             else:
@@ -3324,6 +3330,7 @@ def get_shapes(model, input_shape):
 
 class MIRO(Algorithm):
     """Mutual-Information Regularization with Oracle"""
+
     def __init__(self, input_shape, num_classes, num_domains, hparams, **kwargs):
         super().__init__(input_shape, num_classes, num_domains, hparams)
         self.input_shape = input_shape
@@ -3335,29 +3342,31 @@ class MIRO(Algorithm):
         )
         self.classifier = nn.Linear(self.featurizer.n_outputs, num_classes)
         self.network = nn.Sequential(self.featurizer, self.classifier)
-        self.ld = hparams['ld']
+        self.ld = hparams["ld"]
 
         # build mean/var encoders
         shapes = get_shapes(self.pre_featurizer, self.input_shape)
-        self.mean_encoders = nn.ModuleList([
-            MeanEncoder(shape) for shape in shapes
-        ])
-        self.var_encoders = nn.ModuleList([
-            VarianceEncoder(shape) for shape in shapes
-        ])
+        self.mean_encoders = nn.ModuleList([MeanEncoder(shape) for shape in shapes])
+        self.var_encoders = nn.ModuleList([VarianceEncoder(shape) for shape in shapes])
 
         # optimizer
         parameters = [
             {"params": self.network.parameters()},
-            {"params": self.mean_encoders.parameters(), "lr": hparams['lr'] * hparams['lr_multi']},
-            {"params": self.var_encoders.parameters(), "lr": hparams['lr'] * hparams['lr_multi']},
+            {
+                "params": self.mean_encoders.parameters(),
+                "lr": hparams["lr"] * hparams["lr_multi"],
+            },
+            {
+                "params": self.var_encoders.parameters(),
+                "lr": hparams["lr"] * hparams["lr_multi"],
+            },
         ]
 
         self.optimizer = torch.optim.Adam(
             parameters,
             # hparams['optimizer']
             lr=self.hparams["lr"],
-            weight_decay=self.hparams['weight_decay']
+            weight_decay=self.hparams["weight_decay"],
         )
 
         # self.optimizer = get_optimizer(
@@ -3381,7 +3390,7 @@ class MIRO(Algorithm):
         with torch.no_grad():
             _, pre_feats = self.pre_featurizer(all_x, ret_feats=True)
 
-        reg_loss = 0.
+        reg_loss = 0.0
         for f, pre_f, mean_enc, var_enc in zip_strict(
             inter_feats, pre_feats, self.mean_encoders, self.var_encoders
         ):
@@ -3389,7 +3398,7 @@ class MIRO(Algorithm):
             mean = mean_enc(f)
             var = var_enc(f)
             vlb = (mean - pre_f).pow(2).div(var) + var.log()
-            reg_loss += vlb.mean() / 2.
+            reg_loss += vlb.mean() / 2.0
 
         loss += reg_loss * self.ld
 
@@ -3405,3 +3414,493 @@ class MIRO(Algorithm):
     def get_forward_model(self):
         forward_model = ForwardModel(self.network)
         return forward_model
+
+
+class RDM(ERM):
+    """RDM - Domain Generalization via Risk Distribution Matching (https://arxiv.org/abs/2310.18598)"""
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(RDM, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.register_buffer("update_count", torch.tensor([0]))
+
+    def my_cdist(self, x1, x2):
+        x1_norm = x1.pow(2).sum(dim=-1, keepdim=True)
+        x2_norm = x2.pow(2).sum(dim=-1, keepdim=True)
+
+        res = torch.addmm(
+            x2_norm.transpose(-2, -1), x1, x2.transpose(-2, -1), alpha=-2
+        ).add_(x1_norm)
+        return res.clamp_min_(1e-30)
+
+    def gaussian_kernel(self, x, y, gamma=[0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000]):
+        D = self.my_cdist(x, y)
+        K = torch.zeros_like(D)
+
+        for g in gamma:
+            K.add_(torch.exp(D.mul(-g)))
+
+        return K
+
+    def mmd(self, x, y):
+        Kxx = self.gaussian_kernel(x, x).mean()
+        Kyy = self.gaussian_kernel(y, y).mean()
+        Kxy = self.gaussian_kernel(x, y).mean()
+        return Kxx + Kyy - 2 * Kxy
+
+    @staticmethod
+    def _moment_penalty(p_mean, q_mean, p_var, q_var):
+        return (p_mean - q_mean) ** 2 + (p_var - q_var) ** 2
+
+    @staticmethod
+    def _kl_penalty(p_mean, q_mean, p_var, q_var):
+        return (
+            0.5 * torch.log(q_var / p_var)
+            + ((p_var) + (p_mean - q_mean) ** 2) / (2 * q_var)
+            - 0.5
+        )
+
+    def _js_penalty(self, p_mean, q_mean, p_var, q_var):
+        m_mean = (p_mean + q_mean) / 2
+        m_var = (p_var + q_var) / 4
+
+        return self._kl_penalty(p_mean, m_mean, p_var, m_var) + self._kl_penalty(
+            q_mean, m_mean, q_var, m_var
+        )
+
+    def update(self, minibatches, unlabeled=None, held_out_minibatches=None):
+        matching_penalty_weight = (
+            self.hparams["rdm_lambda"]
+            if self.update_count >= self.hparams["rdm_penalty_anneal_iters"]
+            else 0.0
+        )
+
+        variance_penalty_weight = (
+            self.hparams["variance_weight"]
+            if self.update_count >= self.hparams["rdm_penalty_anneal_iters"]
+            else 0.0
+        )
+
+        all_x = torch.cat([x for x, y in minibatches])
+        all_logits = self.predict(all_x)
+        losses = torch.zeros(len(minibatches)).cuda()
+        all_logits_idx = 0
+        all_confs_envs = None
+
+        for i, (x, y) in enumerate(minibatches):
+            logits = all_logits[all_logits_idx : all_logits_idx + x.shape[0]]
+            all_logits_idx += x.shape[0]
+            losses[i] = F.cross_entropy(logits, y)
+
+            nll = F.cross_entropy(logits, y, reduction="none").unsqueeze(0)
+
+            if all_confs_envs is None:
+                all_confs_envs = nll
+            else:
+                all_confs_envs = torch.cat([all_confs_envs, nll], dim=0)
+
+        erm_loss = losses.mean()
+
+        ## squeeze the risks
+        all_confs_envs = torch.squeeze(all_confs_envs)
+
+        ## find the worst domain
+        worst_env_idx = torch.argmax(torch.clone(losses))
+        all_confs_worst_env = all_confs_envs[worst_env_idx]
+
+        ## flatten the risk
+        all_confs_worst_env_flat = torch.flatten(all_confs_worst_env)
+        all_confs_all_envs_flat = torch.flatten(all_confs_envs)
+
+        matching_penalty = self.mmd(
+            all_confs_worst_env_flat.unsqueeze(1), all_confs_all_envs_flat.unsqueeze(1)
+        )
+
+        ## variance penalty
+        variance_penalty = torch.var(all_confs_all_envs_flat)
+        variance_penalty += torch.var(all_confs_worst_env_flat)
+
+        total_loss = (
+            erm_loss
+            + matching_penalty_weight * matching_penalty
+            + variance_penalty_weight * variance_penalty
+        )
+
+        if self.update_count == self.hparams["rdm_penalty_anneal_iters"]:
+            # Reset Adam, because it doesn't like the sharp jump in gradient
+            # magnitudes that happens at this step.
+            self.optimizer = torch.optim.Adam(
+                self.network.parameters(),
+                lr=self.hparams["rdm_lr"],
+                weight_decay=self.hparams["weight_decay"],
+            )
+
+        self.optimizer.zero_grad()
+        total_loss.backward()
+        self.optimizer.step()
+
+        self.update_count += 1
+
+        return {
+            "update_count": self.update_count.item(),
+            "total_loss": total_loss.item(),
+            "erm_loss": erm_loss.item(),
+            "matching_penalty": matching_penalty.item(),
+            "variance_penalty": variance_penalty.item(),
+            "rdm_lambda": self.hparams["rdm_lambda"],
+        }
+
+
+class URM(ERM):
+    """
+    Implementation of Uniform Risk Minimization, as seen in Uniformly Distributed Feature Representations for
+    Fair and Robust Learning. TMLR 2024 (https://openreview.net/forum?id=PgLbS5yp8n)
+    """
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        ERM.__init__(self, input_shape, num_classes, num_domains, hparams)
+
+        # setup discriminator model for URM adversarial training
+        self._setup_adversarial_net()
+
+        self.loss = torch.nn.CrossEntropyLoss(reduction="none")
+
+    def _modify_generator_output(self):
+        print("--> Modifying encoder output:", self.hparams["urm_generator_output"])
+
+        from domainbed.lib import wide_resnet
+
+        assert type(self.featurizer) in [
+            networks.MLP,
+            networks.MNIST_CNN,
+            wide_resnet.Wide_ResNet,
+            networks.ResNet,
+        ]
+
+        if self.hparams["urm_generator_output"] == "tanh":
+            self.featurizer.activation = nn.Tanh()
+
+        elif self.hparams["urm_generator_output"] == "sigmoid":
+            self.featurizer.activation = nn.Sigmoid()
+
+        elif self.hparams["urm_generator_output"] == "identity":
+            self.featurizer.activation = nn.Identity()
+
+        elif self.hparams["urm_generator_output"] == "relu":
+            self.featurizer.activation = nn.ReLU()
+
+        else:
+            raise Exception(
+                "unrecognized output activation: %s"
+                % self.hparams["urm_generator_output"]
+            )
+
+    def _setup_adversarial_net(self):
+        print("--> Initializing discriminator <--")
+        self.discriminator = self._init_discriminator()
+        self.discriminator_loss = torch.nn.BCEWithLogitsLoss(
+            reduction="mean"
+        )  # apply on logit
+
+        # featurizer optimized by self.optimizer only
+        if self.hparams["urm_discriminator_optimizer"] == "sgd":
+            self.discriminator_opt = torch.optim.SGD(
+                self.discriminator.parameters(),
+                lr=self.hparams["urm_discriminator_lr"],
+                weight_decay=self.hparams["weight_decay"],
+                momentum=0.9,
+            )
+        elif self.hparams["urm_discriminator_optimizer"] == "adam":
+            self.discriminator_opt = torch.optim.Adam(
+                self.discriminator.parameters(),
+                lr=self.hparams["urm_discriminator_lr"],
+                weight_decay=self.hparams["weight_decay"],
+            )
+        else:
+            raise Exception(
+                "%s unimplemented" % self.hparams["urm_discriminator_optimizer"]
+            )
+
+        self._modify_generator_output()
+        self.sigmoid = nn.Sigmoid()  # to compute discriminator acc.
+
+    def _init_discriminator(self):
+        """
+        3 hidden layer MLP
+        """
+        model = nn.Sequential()
+        model.add_module("dense1", nn.Linear(self.featurizer.n_outputs, 100))
+        model.add_module("act1", nn.LeakyReLU())
+
+        for _ in range(self.hparams["urm_discriminator_hidden_layers"]):
+            model.add_module("dense%d" % (2 + _), nn.Linear(100, 100))
+            model.add_module("act2%d" % (2 + _), nn.LeakyReLU())
+
+        model.add_module("output", nn.Linear(100, 1))
+        return model
+
+    def _generate_noise(self, feats):
+        """
+        If U is a random variable uniformly distributed on [0, 1), then (b-a)*U + a is uniformly distributed on [a, b).
+        """
+        if self.hparams["urm_generator_output"] == "tanh":
+            a, b = -1, 1
+        elif self.hparams["urm_generator_output"] == "relu":
+            a, b = 0, 1
+        elif self.hparams["urm_generator_output"] == "sigmoid":
+            a, b = 0, 1
+        else:
+            raise Exception(
+                "unrecognized output activation: %s"
+                % self.hparams["urm_generator_output"]
+            )
+
+        uniform_noise = torch.rand(
+            feats.size(), dtype=feats.dtype, layout=feats.layout, device=feats.device
+        )  # U~[0,1]
+        n = ((b - a) * uniform_noise) + a  # n ~ [a,b)
+        return n
+
+    def _generate_soft_labels(self, size, device, a, b):
+        # returns size random numbers in [a,b]
+        uniform_noise = torch.rand(size, device=device)  # U~[0,1]
+        return ((b - a) * uniform_noise) + a
+
+    def get_accuracy(self, y_true, y_prob):
+        # y_prob is binary probability
+        assert y_true.ndim == 1 and y_true.size() == y_prob.size()
+        y_prob = y_prob > 0.5
+        return (y_true == y_prob).sum().item() / y_true.size(0)
+
+    def return_feats(self, x):
+        return self.featurizer(x)
+
+    def _update_discriminator(self, x, y, feats):
+        # feats = self.return_feats(x)
+        feats = feats.detach()  # don't backbrop through encoder in this step
+        noise = self._generate_noise(feats)
+
+        noise_logits = self.discriminator(noise)  # (N,1)
+        feats_logits = self.discriminator(feats)  # (N,1)
+
+        # hard targets
+        hard_true_y = torch.tensor(
+            [1] * noise.shape[0], device=noise.device, dtype=noise.dtype
+        )  # [1,1...1] noise is true
+        hard_fake_y = torch.tensor(
+            [0] * feats.shape[0], device=feats.device, dtype=feats.dtype
+        )  # [0,0...0] feats are fake (generated)
+
+        if self.hparams["urm_discriminator_label_smoothing"]:
+            # label smoothing in discriminator
+            soft_true_y = self._generate_soft_labels(
+                noise.shape[0],
+                noise.device,
+                1 - self.hparams["urm_discriminator_label_smoothing"],
+                1.0,
+            )  # random labels in range
+            soft_fake_y = self._generate_soft_labels(
+                feats.shape[0],
+                feats.device,
+                0,
+                0 + self.hparams["urm_discriminator_label_smoothing"],
+            )  # random labels in range
+            true_y = soft_true_y
+            fake_y = soft_fake_y
+        else:
+            true_y = hard_true_y
+            fake_y = hard_fake_y
+
+        noise_loss = self.discriminator_loss(
+            noise_logits.squeeze(1), true_y
+        )  # pass logits to BCEWithLogitsLoss
+        feats_loss = self.discriminator_loss(
+            feats_logits.squeeze(1), fake_y
+        )  # pass logits to BCEWithLogitsLoss
+
+        d_loss = 1 * noise_loss + self.hparams["urm_adv_lambda"] * feats_loss
+
+        # update discriminator
+        self.discriminator_opt.zero_grad()
+        d_loss.backward()
+        self.discriminator_opt.step()
+
+    def _compute_loss(self, x, y):
+        feats = self.return_feats(x)
+        ce_loss = self.loss(self.classifier(feats), y).mean()
+
+        # train generator/encoder to make discriminator classify feats as noise (label 1)
+        true_y = torch.tensor(
+            feats.shape[0] * [1], device=feats.device, dtype=feats.dtype
+        )
+        g_logits = self.discriminator(feats)
+        g_loss = self.discriminator_loss(
+            g_logits.squeeze(1), true_y
+        )  # apply BCEWithLogitsLoss to discriminator's logit output
+        loss = ce_loss + self.hparams["urm_adv_lambda"] * g_loss
+
+        return loss, feats
+
+    def update(self, minibatches, unlabeled=None):
+        all_x = torch.cat([x for x, y in minibatches])
+        all_y = torch.cat([y for x, y in minibatches])
+
+        loss, feats = self._compute_loss(all_x, all_y)
+
+        self.optimizer.zero_grad()
+
+        loss.backward()
+        self.optimizer.step()
+
+        self._update_discriminator(all_x, all_y, feats)
+
+        return {"loss": loss.item()}
+
+
+class ADRMX(Algorithm):
+    """ADRMX: Additive Disentanglement of Domain Features with Remix Loss from (https://arxiv.org/abs/2308.06624)"""
+
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(ADRMX, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.register_buffer("update_count", torch.tensor([0]))
+
+        self.num_classes = num_classes
+        self.num_domains = num_domains
+        self.mix_num = 1
+        self.scl_int = SupConLossLambda(lamda=0.5)
+        self.scl_final = SupConLossLambda(lamda=0.5)
+
+        self.featurizer_label = networks.Featurizer(input_shape, self.hparams)
+        self.featurizer_domain = networks.Featurizer(input_shape, self.hparams)
+
+        self.discriminator = networks.MLP(
+            self.featurizer_domain.n_outputs, num_domains, self.hparams
+        )
+
+        self.classifier_label_1 = networks.Classifier(
+            self.featurizer_label.n_outputs, num_classes, is_nonlinear=True
+        )
+
+        self.classifier_label_2 = networks.Classifier(
+            self.featurizer_label.n_outputs, num_classes, is_nonlinear=True
+        )
+
+        self.classifier_domain = networks.Classifier(
+            self.featurizer_domain.n_outputs, num_domains, is_nonlinear=True
+        )
+
+        self.network = nn.Sequential(self.featurizer_label, self.classifier_label_1)
+
+        self.disc_opt = torch.optim.Adam(
+            (list(self.discriminator.parameters())),
+            lr=self.hparams["lr"],
+            betas=(self.hparams["beta1"], 0.9),
+        )
+
+        self.opt = torch.optim.Adam(
+            (
+                list(self.featurizer_label.parameters())
+                + list(self.featurizer_domain.parameters())
+                + list(self.classifier_label_1.parameters())
+                + list(self.classifier_label_2.parameters())
+                + list(self.classifier_domain.parameters())
+            ),
+            lr=self.hparams["lr"],
+            betas=(self.hparams["beta1"], 0.9),
+        )
+
+    def update(self, minibatches, unlabeled=None):
+        self.update_count += 1
+        all_x = torch.cat([x for x, _ in minibatches])
+        all_y = torch.cat([y for _, y in minibatches])
+
+        feat_label = self.featurizer_label(all_x)
+        feat_domain = self.featurizer_domain(all_x)
+        feat_combined = feat_label - feat_domain
+
+        # get domain labels
+        disc_labels = torch.cat(
+            [
+                torch.full((x.shape[0],), i, dtype=torch.int64, device=all_x.device)
+                for i, (x, _) in enumerate(minibatches)
+            ]
+        )
+        # predict domain feats from disentangled features
+        disc_out = self.discriminator(feat_combined)
+        disc_loss = F.cross_entropy(
+            disc_out, disc_labels
+        )  # discriminative loss for final labels (ascend/descend)
+
+        d_steps_per_g = self.hparams["d_steps_per_g_step"]
+        # alternating losses
+        if self.update_count.item() % (1 + d_steps_per_g) < d_steps_per_g:
+            # in discriminator turn
+            self.disc_opt.zero_grad()
+            disc_loss.backward()
+            self.disc_opt.step()
+            return {"loss_disc": disc_loss.item()}
+        else:
+            # in generator turn
+
+            # calculate CE from x_domain
+            domain_preds = self.classifier_domain(feat_domain)
+            classifier_loss_domain = F.cross_entropy(
+                domain_preds, disc_labels
+            )  # domain clf loss
+            classifier_remixed_loss = 0
+
+            # calculate CE and contrastive loss from x_label
+            int_preds = self.classifier_label_1(feat_label)
+            classifier_loss_int = F.cross_entropy(
+                int_preds, all_y
+            )  # intermediate CE Loss
+            cnt_loss_int = self.scl_int(feat_label, all_y, disc_labels)
+
+            # calculate CE and contrastive loss from x_dinv
+            final_preds = self.classifier_label_2(feat_combined)
+            classifier_loss_final = F.cross_entropy(final_preds, all_y)  # final CE Loss
+            cnt_loss_final = self.scl_final(feat_combined, all_y, disc_labels)
+
+            # remix strategy
+            for i in range(self.num_classes):
+                indices = torch.where(all_y == i)[0]
+                for _ in range(self.mix_num):
+                    # get two instances from same class with different domains
+                    perm = torch.randperm(indices.numel())
+                    if len(perm) < 2:
+                        continue
+                    idx1, idx2 = perm[:2]
+                    # remix
+                    remixed_feat = feat_combined[idx1] + feat_domain[idx2]
+                    # make prediction
+                    pred = self.classifier_label_1(remixed_feat.view(1, -1))
+                    # accumulate the loss
+                    classifier_remixed_loss += F.cross_entropy(
+                        pred.view(1, -1), all_y[idx1].view(-1)
+                    )
+            # normalize
+            classifier_remixed_loss /= self.num_classes * self.mix_num
+
+            # generator loss negates the discrimination loss (negative update)
+            gen_loss = (
+                classifier_loss_int
+                + classifier_loss_final
+                + self.hparams["dclf_lambda"] * classifier_loss_domain
+                + self.hparams["rmxd_lambda"] * classifier_remixed_loss
+                + self.hparams["cnt_lambda"] * (cnt_loss_int + cnt_loss_final)
+                + (self.hparams["disc_lambda"] * -disc_loss)
+            )
+            self.disc_opt.zero_grad()
+            self.opt.zero_grad()
+            gen_loss.backward()
+            self.opt.step()
+
+            return {
+                "loss_total": gen_loss.item(),
+                "loss_cnt_int": cnt_loss_int.item(),
+                "loss_cnt_final": cnt_loss_final.item(),
+                "loss_clf_int": classifier_loss_int.item(),
+                "loss_clf_fin": classifier_loss_final.item(),
+                "loss_dmn": classifier_loss_domain.item(),
+                "loss_disc": disc_loss.item(),
+                "loss_remixed": classifier_remixed_loss.item(),
+            }
