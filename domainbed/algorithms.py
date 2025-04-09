@@ -3808,6 +3808,9 @@ class ADRMX(Algorithm):
             betas=(self.hparams["beta1"], 0.9),
         )
 
+    def predict(self, x):
+        return self.network(x)
+
     def update(self, minibatches, unlabeled=None):
         self.update_count += 1
         all_x = torch.cat([x for x, _ in minibatches])
