@@ -17,6 +17,7 @@ import torch
 import torchmetrics
 from collections import Counter
 from itertools import cycle, chain
+import torch.nn.functional as F
 
 import pandas as pd
 from sklearn.manifold import TSNE
@@ -224,6 +225,7 @@ def split_meta_train_test(minibatches, num_meta_test=1):
 def accuracy(network, loader, weights, device, dataset):
     correct = 0
     total = 0
+    losssum = 0.0
     weights_offset = 0
 
     overlapping_classes = dataset.overlapping_classes
@@ -251,6 +253,8 @@ def accuracy(network, loader, weights, device, dataset):
             x = x.to(device)
             y = y.to(device)
             p = network.predict(x)
+            loss = F.cross_entropy(p, y).item()
+            losssum += loss*len(x)
             # network.intermediate
             if weights is None:
                 batch_weights = torch.ones(len(x))
@@ -271,6 +275,8 @@ def accuracy(network, loader, weights, device, dataset):
             f1_score.update(p, y)
             per_class_accuracy.update(p, y)
     network.train()
+
+    loss = losssum / total
 
     compute_acc = accuracy.compute().item()
     compute_f1 = f1_score.compute().item()
@@ -301,7 +307,7 @@ def accuracy(network, loader, weights, device, dataset):
 
     assert np.isclose(other_acc, compute_acc, atol=1e-06), f"{other_acc}, {compute_acc}"
 
-    return float(compute_acc), float(compute_f1), float(overlap_class_acc), float(non_overlap_class_acc), per_class_acc_dict
+    return loss, float(compute_acc), float(compute_f1), float(overlap_class_acc), float(non_overlap_class_acc), per_class_acc_dict
 
 def get_tsne_data(network, loader, device, domain, is_test_env, n=-1):
     df = pd.DataFrame({'latent_vector' : [], 'prediction' : [], 

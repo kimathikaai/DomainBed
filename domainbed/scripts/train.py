@@ -25,7 +25,8 @@ from dotenv import load_dotenv
 from domainbed import datasets
 from domainbed import hparams_registry
 from domainbed import algorithms
-from domainbed.lib import misc
+from domainbed.lib import misc, swa_utils
+import domainbed.lib.swad as swad_module
 from domainbed.lib.fast_data_loader import InfiniteDataLoader, FastDataLoader
 
 if __name__ == "__main__":
@@ -63,6 +64,8 @@ if __name__ == "__main__":
     parser.add_argument('--skip_model_save', action='store_true')
     parser.add_argument('--save_model_every_checkpoint', action='store_true')
     parser.add_argument("--wandb_project", type=str, default='fond')
+
+    parser.add_argument('--use_swad', type=int, choices=[0,1], default=0)
 
     args = parser.parse_args()
 
@@ -116,6 +119,9 @@ if __name__ == "__main__":
             misc.seed_hash(args.hparams_seed, args.trial_seed))
     if args.hparams:
         hparams.update(json.loads(args.hparams))
+
+    ####------ SWAD
+    hparams['swad_kwargs'] = {'n_converge':3, 'n_tolerance': 6, 'tolerance_ratio': 0.3}
 
     print('HParams:')
     for k, v in sorted(hparams.items()):
@@ -214,14 +220,22 @@ if __name__ == "__main__":
     eval_loader_names += ['env{}_uda'.format(i)
         for i in range(len(uda_splits))]
 
+    num_train_envs = len(dataset)-len(args.test_envs)
     algorithm_class = algorithms.get_algorithm_class(args.algorithm)
     algorithm = algorithm_class(dataset.input_shape, dataset.num_classes,
-        len(dataset) - len(args.test_envs), hparams)
+        num_train_envs, hparams)
 
     if algorithm_dict is not None:
         algorithm.load_state_dict(algorithm_dict)
 
     algorithm.to(device)
+
+    ####------ SWAD
+    swad = None
+    if args.use_swad == 1:
+        swad_algorithm = swa_utils.AveragedModel(algorithm)
+        swad_cls = getattr(swad_module, "LossValley")
+        swad = swad_cls(evaluator=None, **hparams["swad_kwargs"])
 
     train_minibatches_iterator = zip(*train_loaders)
     uda_minibatches_iterator = zip(*uda_loaders)
@@ -263,6 +277,10 @@ if __name__ == "__main__":
             checkpoint_vals[key].append(val)
             wandb.log({f"step/{key}": val, 'step': step, 'epoch':step/steps_per_epoch})
 
+        if swad:
+            # swad_algorithm is segment_swa for swad
+            swad_algorithm.update_parameters(algorithm, step=step)
+
         if (step % checkpoint_freq == 0) or (step == n_steps - 1):
             results = {
                 'step': step,
@@ -280,25 +298,38 @@ if __name__ == "__main__":
                     'epoch':step/steps_per_epoch
                 })
 
+            # Additional Summary Metrics
+            summaries = collections.defaultdict(float)
+            summaries["test_in"] = 0.0
+            summaries["test_out"] = 0.0
+            summaries["train_in"] = 0.0
+            summaries["train_out"] = 0.0
+
             tsne_dfs = []
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
             for name, loader, weights in evals:
+
+                # Domain metadata
+                env_name, inout = name.split("_")
+                env_num = int(env_name[3:])
+                is_test_loader = True if env_num in args.test_envs else False
+
                 metric_values = misc.accuracy(algorithm, loader, weights, device, dataset)
-                domain_idx = int(name[3]) # env{domain_idx}_{rest_of_string} is how name is formatted
-                is_test_loader = True if domain_idx in args.test_envs else False
 
                 if step == n_steps - 1:
                     # Only get tsne data for last step
                     df_domain = misc.get_tsne_data(algorithm, loader, device, 
-                                            domain_idx, is_test_loader, n=args.tsne_data_lim)
+                                            env_num, is_test_loader, n=args.tsne_data_lim)
                     tsne_dfs.append(df_domain)
 
-                acc, f1, overlap_class_acc, non_overlap_class_acc, per_class_acc = metric_values
+                loss, acc, f1, overlap_class_acc, non_overlap_class_acc, per_class_acc = metric_values
+
                 metric_values = {
                     name+'_acc': float(acc),
                     name+'_f1': float(f1),
                     name+'_nacc': float(non_overlap_class_acc),
-                    name+'_oacc': float(overlap_class_acc)
+                    name+'_oacc': float(overlap_class_acc),
+                    name+'_loss': float(loss)
                 }
                 for class_id, class_acc in per_class_acc.items():
                     metric_values[name+'_accC'+str(class_id)] = class_acc
@@ -313,6 +344,10 @@ if __name__ == "__main__":
                         'step': step, 
                         'epoch':step/steps_per_epoch
                     })
+
+                # Store train aggregate loss
+                if not is_test_loader and inout == 'out':
+                    summaries['tr_'+inout+"_loss"] += loss/num_train_envs
 
                 # log hparams
                 if is_test_loader and "in" in name and step == n_steps - 1: 
@@ -330,6 +365,12 @@ if __name__ == "__main__":
                     # hparams.pop("C_oc") # can't be stored
                     #
                     # tb_writer.add_hparams(hparams,values)
+
+            wandb.log({
+                f"checkpoint/tr_out_loss": summaries['tr_out_loss'], 
+                'step': step, 
+                'epoch':step/steps_per_epoch
+            })
             
             if step == n_steps - 1:
                 tsne_df = pd.concat(tsne_dfs)
@@ -360,6 +401,26 @@ if __name__ == "__main__":
 
             if args.save_model_every_checkpoint:
                 save_checkpoint(f'model_step{step}.pkl')
+
+            # swad
+            if swad:
+                def prt_results_fn(results, avgmodel):
+                    step_str = f" [{avgmodel.start_step}-{avgmodel.end_step}]"
+                    row = misc.to_row([results[key] for key in results_keys if key in results])
+                    print("[swad]",row + step_str)
+
+                # swad.update_and_evaluate(
+                #     swad_algorithm, results["train_out"], results["tr_outloss"], prt_results_fn
+                # )
+                swad.update_and_evaluate(
+                    swad_algorithm, val_acc=None, val_loss=summaries["tr_out_loss"], prt_fn=prt_results_fn
+                )
+
+                if hasattr(swad, "dead_valley") and swad.dead_valley:
+                    print("[swad] SWAD valley is dead -> early stop !")
+                    break
+
+                swad_algorithm = swa_utils.AveragedModel(algorithm)  # reset
 
     tb_writer.flush()
     tb_writer.close()
