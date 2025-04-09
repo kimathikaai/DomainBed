@@ -54,6 +54,26 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('mlp_depth', 3, lambda r: int(r.choice([3, 4, 5])))
         _hparam('mlp_dropout', 0., lambda r: r.choice([0., 0.1, 0.5]))
 
+    elif algorithm == "RDM": 
+        if dataset in ['DomainNet']: 
+            _hparam('rdm_lambda', 0.5, lambda r: r.uniform(0.1, 1.0))
+        elif dataset in ['PACS', 'TerraIncognita']:
+            _hparam('rdm_lambda', 5.0, lambda r: r.uniform(1.0, 10.0))
+        else:
+            _hparam('rdm_lambda', 5.0, lambda r: r.uniform(0.1, 10.0))
+            
+        if dataset == 'DomainNet':
+            _hparam('rdm_penalty_anneal_iters', 2400, lambda r: int(r.uniform(1500, 3000)))
+        else:
+            _hparam('rdm_penalty_anneal_iters', 1500, lambda r: int(r.uniform(800, 2700)))
+            
+        if dataset in ['TerraIncognita', 'OfficeHome', 'DomainNet']:
+            _hparam('variance_weight', 0.0, lambda r: r.choice([0.0]))
+        else:
+            _hparam('variance_weight', 0.004, lambda r: r.uniform(0.001, 0.007))
+            
+        _hparam('rdm_lr', 1.5e-5, lambda r: r.uniform(8e-6, 2e-5))
+
     elif algorithm == 'Fish':
         _hparam('meta_lr', 0.5, lambda r:r.choice([0.05, 0.1, 0.5]))
 
@@ -142,6 +162,20 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('beta1', 0.5, lambda r: r.choice([0., 0.5]))
         _hparam('lr_d', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
 
+    elif algorithm == 'URM':
+        _hparam('urm', 'adversarial', lambda r: str(r.choice(['adversarial']))) # 'adversarial'
+        
+        _hparam('urm_adv_lambda', 0.1, lambda r: float(r.uniform(0,0.2)))
+        _hparam('urm_discriminator_label_smoothing', 0, lambda r: float(r.uniform(0, 0)))
+        _hparam('urm_discriminator_optimizer', 'adam', lambda r: str(r.choice(['adam'])))
+        _hparam('urm_discriminator_hidden_layers', 1, lambda r: int(r.choice([1,2,3])))
+        _hparam('urm_generator_output', 'tanh', lambda r: str(r.choice(['tanh', 'relu'])))
+                
+        if dataset in SMALL_IMAGES:
+            _hparam('urm_discriminator_lr', 1e-3, lambda r: 10**r.uniform(-5.5, -3.5))
+        else:
+            _hparam('urm_discriminator_lr', 5e-5, lambda r: 10**r.uniform(-6, -4.5))
+
     elif algorithm == "XDomError":
         _hparam('temperature', 0.07, lambda r: 0.07 * r.uniform(0.75, 1.25))
         _hparam('base_temperature', 0.07, lambda r: 0.07)
@@ -228,15 +262,32 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('ld', 0.1, lambda r: 0.1)
         _hparam('lr_multi', 10.0 , lambda r: 10.0)
 
+    elif algorithm == "ADRMX":
+        _hparam('cnt_lambda', 1.0, lambda r: r.choice([1.0]))
+        _hparam('dclf_lambda', 1.0, lambda r: r.choice([1.0]))
+        _hparam('disc_lambda', 0.75, lambda r: r.choice([0.75]))
+        _hparam('rmxd_lambda', 1.0, lambda r: r.choice([1.0]))
+        _hparam('d_steps_per_g_step', 2, lambda r: r.choice([2]))
+        _hparam('beta1', 0.5, lambda r: r.choice([0.5]))
+        _hparam('mlp_width', 256, lambda r: r.choice([256]))
+        _hparam('mlp_depth', 9, lambda r: int(r.choice([8, 9, 10])))
+        _hparam('mlp_dropout', 0., lambda r: r.choice([0]))
+
 
 
     # Dataset-and-algorithm-specific hparam definitions. Each block of code
     # below corresponds to exactly one hparam. Avoid nested conditionals.
 
     if dataset in SMALL_IMAGES:
-        _hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
+        if algorithm == "ADRMX":
+            _hparam('lr', 3e-3, lambda r: r.choice([5e-4, 1e-3, 2e-3, 3e-3]))
+        else:
+            _hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
     else:
-        _hparam('lr', 5e-5, lambda r: 10**r.uniform(-5, -3.5))
+        if algorithm == "ADRMX":
+            _hparam('lr', 3e-5, lambda r: r.choice([2e-5, 3e-5, 4e-5, 5e-5]))
+        else:
+            _hparam('lr', 5e-5, lambda r: 10**r.uniform(-5, -3.5))
 
     if dataset in SMALL_IMAGES:
         _hparam('weight_decay', 0., lambda r: 0.)
@@ -247,6 +298,11 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('batch_size', 64, lambda r: int(2**r.uniform(3, 9)))
     elif algorithm == 'ARM':
         _hparam('batch_size', 8, lambda r: 8)
+    elif algorithm == 'RDM':
+        if dataset in ['DomainNet', 'TerraIncognita']:
+            _hparam('batch_size', 40, lambda r: int(r.uniform(30, 60)))
+        else:
+            _hparam('batch_size', 88, lambda r: int(r.uniform(70, 100)))
     elif dataset == 'DomainNet':
         _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5)))
     else:
