@@ -316,7 +316,7 @@ if __name__ == "__main__":
 
                 metric_values = misc.accuracy(algorithm, loader, weights, device, dataset)
 
-                if step == n_steps - 1:
+                if step == n_steps - 1 and False:
                     # Only get tsne data for last step
                     df_domain = misc.get_tsne_data(algorithm, loader, device, 
                                             env_num, is_test_loader, n=args.tsne_data_lim)
@@ -372,7 +372,7 @@ if __name__ == "__main__":
                 'epoch':step/steps_per_epoch
             })
             
-            if step == n_steps - 1:
+            if step == n_steps - 1 and False:
                 tsne_df = pd.concat(tsne_dfs)
                 tsne_df.to_pickle(os.path.join(args.output_dir, f'tsne_data.pickle'))
                 print(os.path.join(args.output_dir, f'tsne_data.pickle'))
