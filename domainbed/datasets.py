@@ -761,7 +761,7 @@ class WILDSCamelyon(DomainBedWILDSDataset):
     ENVIRONMENTS = [ "hospital_0", "hospital_1", "hospital_2", "hospital_3",
             "hospital_4"]
     NUM_CLASSES = 2
-    N_OC = {"1": {"N_oc": 1}}
+    N_OC = {"1": {"N_oc": 1}, "3":{"N_oc": 2}}
     def __init__(self, root, test_envs, hparams, overlap: str = "3", overlap_seed=None):
         dataset = Camelyon17Dataset(root_dir=root)
         self.class_overlap = {
